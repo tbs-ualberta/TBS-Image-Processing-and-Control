@@ -10,12 +10,12 @@ import shutil
 import numpy as np
 import open3d as o3d
 import imageio
-import matplotlib.pyplot as plt
-import requests
-from PIL import Image
-from io import BytesIO
-from lang_sam import LangSAM
-import time
+# import matplotlib.pyplot as plt
+# import requests
+# from PIL import Image
+# from io import BytesIO
+# from lang_sam import LangSAM
+# import time
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
