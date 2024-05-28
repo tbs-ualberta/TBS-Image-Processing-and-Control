@@ -1,8 +1,0 @@
-prefix=/home/wmm/catkin_ws/src/build/devel
-
-Name: img_processor
-Description: Description of img_processor
-Version: 0.1.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

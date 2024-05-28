@@ -1,8 +1,0 @@
-prefix=/usr/local
-
-Name: kinect_pub
-Description: Description of kinect_pub
-Version: 0.1.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: roscpp sensor_msgs cv_bridge
