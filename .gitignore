@@ -6,5 +6,5 @@ __pycache__/
 env/
 venv/
 
-# Ignore groundingDINO folder
-/img_processor/scripts/groundingDINO/
+# Ignore build folder
+/build/

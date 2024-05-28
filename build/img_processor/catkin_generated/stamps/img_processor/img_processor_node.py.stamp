@@ -146,7 +146,7 @@ class ImageSaverProcessor:
 
             rospy.loginfo(f"Saved images at index" + str(self.save_count).zfill(6))
 
-    def map_rgb_to_depth(rgb_x, rgb_y, depth_image):
+    def map_rgb_to_depth(self, rgb_x, rgb_y, depth_image):
         """Map an RGB pixel to the corresponding depth pixel and retrieve the depth value."""
         # Step 1: Normalize the RGB pixel coordinates
         normalized_rgb_point = np.linalg.inv(RGB_INTRINSICS).dot([rgb_x, rgb_y, 1])
@@ -169,7 +169,7 @@ class ImageSaverProcessor:
             depth_value = depth_image[int(depth_y), int(depth_x)]
             return depth_value
         else:
-            raise ValueError("The computed depth pixel is out of bounds.")
+            rospy.ERROR("The computed depth pixel is out of bounds.")
 
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
@@ -182,9 +182,9 @@ class ImageSaverProcessor:
             
             # Calculate corresponding depth value of from RGB pixel coordinates
             depth_val = self.map_rgb_to_depth(rgb_x, rgb_y, self.depth_image)
-
+            
             rospy.loginfo("The depth value for the point (" + str(rgb_x) + ", " + str(rgb_y) + ") is " + str(depth_val) + "mm.")
-
+            
             # -----------------------------------------------------------------------------
 
             # Reset images after processing
