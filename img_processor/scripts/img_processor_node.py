@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-
+import sys
 import rospy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image as msg_img
 import message_filters
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -10,12 +9,14 @@ import shutil
 import numpy as np
 import open3d as o3d
 import imageio
-import matplotlib.pyplot as plt
-import requests
-# from PIL import Image
-from io import BytesIO
-from lang_sam import LangSAM
+# import matplotlib.pyplot as plt
+# import requests
 # import time
+# from PIL import Image
+# from io import BytesIO
+# sys.path.append('/home/wmm/catkin_ws/src/img_processor/scripts/lang-segment-anything/lang_sam')
+# sys.path.append('/home/wmm/catkin_ws/src/img_processor/scripts/GroundingDINO')
+# from lang_sam import LangSAM
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
@@ -87,8 +88,8 @@ class ImageSaverProcessor:
         self.save_count = 1
 
         # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', Image)
-        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', Image)
+        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', msg_img)
+        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', msg_img)
 
         # Synchronize the topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
