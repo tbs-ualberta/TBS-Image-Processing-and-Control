@@ -8,3 +8,6 @@ venv/
 
 # Ignore build folder
 /build/
+
+/img_processor/scripts/GroundingDINO
+/img_processor/scripts/lang-segment-anything
