@@ -7,4 +7,4 @@ env/
 venv/
 
 # Ignore groundingDINO folder
-groundingDINO/
+/img_processor/scripts/groundingDINO/
