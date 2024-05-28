@@ -10,11 +10,11 @@ import shutil
 import numpy as np
 import open3d as o3d
 import imageio
-# import matplotlib.pyplot as plt
-# import requests
+import matplotlib.pyplot as plt
+import requests
 # from PIL import Image
-# from io import BytesIO
-# from lang_sam import LangSAM
+from io import BytesIO
+from lang_sam import LangSAM
 # import time
 
 # -------------------------------------------- User defined constants ------------------------------------------------
@@ -29,7 +29,7 @@ SAVE_FOLDER_NAME = 'kinect_images'
 PROCESS_IMAGES = True
 
 # Processing frequency
-PROCESSING_RATE = 0.5 # in Hz
+PROCESSING_RATE = 1 # in Hz
 
 # Select whether images should save or not
 SAVE_IMAGES = False
@@ -169,16 +169,17 @@ class ImageSaverProcessor:
             depth_value = depth_image[int(depth_y), int(depth_x)]
             return depth_value
         else:
-            rospy.ERROR("The computed depth pixel is out of bounds.")
+            rospy.logerr("The computed depth pixel is out of bounds.")
+            return -1
 
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
             rospy.loginfo("Processing images")
 
             # -----------------------------Process Images----------------------------------
-
-            rgb_x = 5
-            rgb_y = 100
+            
+            rgb_x = 960
+            rgb_y = 540
             
             # Calculate corresponding depth value of from RGB pixel coordinates
             depth_val = self.map_rgb_to_depth(rgb_x, rgb_y, self.depth_image)

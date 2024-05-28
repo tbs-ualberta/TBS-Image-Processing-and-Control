@@ -8,6 +8,9 @@ from cv_bridge import CvBridge, CvBridgeError
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
+# Select whether to displayed normalized image map
+DISPLAY_NORM = True
+
 # Frequency of images being displayed
 DISPLAY_RATE = 20 # in Hz
 
@@ -29,9 +32,14 @@ class ImageSaverProcessor:
 
         # Define subscribers for depth and rgb topics
         self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', Image)
-        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', Image)
 
-        # Synchronize the topics
+        # Choose which topic to subscribe to, depending on whether normalization should be displayed
+        if DISPLAY_NORM:
+            self.depth_sub = message_filters.Subscriber('/kinect2/depth_norm', Image)
+        else:
+            self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', Image)
+
+        # Synchronize the topics   
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
         self.ts.registerCallback(self.callback)
 
@@ -41,7 +49,7 @@ class ImageSaverProcessor:
 
         self.display_timer = rospy.Timer(rospy.Duration(DISPLAY_INTERVAL), self.display_images)
 
-        rospy.loginfo("Image Processor Node Started")
+        rospy.loginfo("Image Display Node Started")
         
     def callback(self, rgb_msg, depth_msg):
         try:
