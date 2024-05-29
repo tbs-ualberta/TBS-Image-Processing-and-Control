@@ -36,8 +36,9 @@ SAVE_FOLDER_NAME = 'kinect_images'
 # Selects whether files should process or not
 PROCESS_IMAGES = True
 
-# Processing frequency
-PROCESSING_RATE = 0.2 # in Hz
+# Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
+# included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
+PROCESSING_RATE = 1 # in Hz
 
 # Select whether images should save or not
 SAVE_IMAGES = False
@@ -46,7 +47,7 @@ SAVE_IMAGES = False
 SAVE_RATE = 1 # in Hz
 
 # This specifies the prompt which the model masks
-PROMPT = "monitor"
+PROMPT = "chair . human"
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -142,7 +143,7 @@ class ImageSaverProcessor:
 
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
-            rospy.loginfo("Processing images")
+            # rospy.loginfo("Processing images")
             try:
                 # -----------------------------Process Images----------------------------------
                 
@@ -154,8 +155,13 @@ class ImageSaverProcessor:
 
                 # Save start time (to evaluate process time)
                 time_start = time.time()
+
+                # Calculate masks and bounding boxes for images
                 masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
-                rospy.loginfo(f"inference time: {time.time() - time_start}")
+
+                # Clear the screen for new output
+                os.system('clear')
+                rospy.logdebug(f"Inference time: {time.time() - time_start}")
 
                 if len(masks) == 0:
                     # If no objects detected
@@ -166,26 +172,27 @@ class ImageSaverProcessor:
 
                     # Create results object
                     results = ProcessingResults(self.rgb_image, masks, boxes, phrases, logits)
-
-                    # Print the bounding boxes, phrases, and logits
-                    results.print_bounding_boxes()
-                    results.print_detected_phrases()
-                    results.print_logits()
-
-                    # Display the original image and masks side by side
-                    results.display_image_with_masks()
-
-                    # Display the image with bounding boxes and confidence scores
-                    results.display_image_with_boxes()
-
-
-                    rgb_x = 960
-                    rgb_y = 540
                     
-                    # Calculate corresponding depth value of from RGB pixel coordinates
-                    depth_val = map_rgb_to_depth(rgb_x, rgb_y, self.depth_image)
-                    
-                    rospy.loginfo("The depth value for the point (" + str(rgb_x) + ", " + str(rgb_y) + ") is " + str(depth_val) + "mm.")
+                    # Calculate the centroids of each map
+                    depth_vals = []
+                    centroids = results.find_object_centroids()
+                    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+                    # Calculate corresponding depth values from RGB pixel coordinates
+                    depth_vals = [map_rgb_to_depth(x, y, self.depth_image) for x, y in centroids_as_pixels]
+
+                    print("-------------------------------------------------------------------------------------------------")
+
+                    # print calculated values
+                    for i, (centroid, depth_val, phrase, logit) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
+                        rospy.loginfo(f"Mask {i+1}: {phrase} (confidence of {logit}")
+                        rospy.loginfo(f"Centroid at: {centroid}, Depth value: {depth_val} mm")
+                        print("-------------------------------------------------------------------------------------------------")
+
+                    # TODO add realtime visualization of the masking algorithm (over rgb image)
+                    # - also add the centroids and depths of each centroid on the image
+
+                rospy.loginfo(f"Total processing time: {time.time() - time_start}")
+                print("-------------------------------------------------------------------------------------------------")
 
             except (requests.exceptions.RequestException, IOError) as e:
                 rospy.logerr(f"Error: {e}")
@@ -209,5 +216,7 @@ if __name__ == '__main__':
     except rospy.ROSInterruptException:
         pass
 
-# TODO add image processing to find objects in frame
-# TODO process the distance to the center of each object
+# TODO sometimes centroid point does not have depth value.
+# Maybe add algorithm to find closest point with depth info and use that (if no depth at exact pixel)?
+
+# TODO add registered image back in (depth mapped over rgb)

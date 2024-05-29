@@ -2,9 +2,10 @@ import rospy
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import measurements
 
 # --------------------------------------- Camera calibration constants -----------------------------------------------
-# Intrinsic parameters
+# Intrinsic parameters - taken from https://github.com/shanilfernando/VRInteraction/blob/master/calibration/camera_param.yaml
 DEPTH_INTRINSICS = np.array([[366.193, 0, 256.684],
                              [0, 366.193, 207.085],
                              [0, 0, 1]])
@@ -80,6 +81,14 @@ class ProcessingResults:
 
         plt.show()
 
+    def find_object_centroids(self):
+        # self.masks is a tensor array of boolean values [1080, 1920]
+        centroids = []
+        for m in self.masks_np:
+            centroid = measurements.center_of_mass(m)
+            centroids.append(centroid)
+        return centroids
+
 # --------------------------------------------------------------------------------------------------------------------
 
 # ---------------------------------------------- Print functions -----------------------------------------------------
@@ -105,6 +114,11 @@ class ProcessingResults:
 # -------------------------------------------- For depth calculation -------------------------------------------------
 def map_rgb_to_depth(rgb_x, rgb_y, depth_image):
         """Map an RGB pixel to the corresponding depth pixel and retrieve the depth value."""
+        # Check if RGB pixel is within image bounds
+        if rgb_x < 0 or rgb_x >= 1920 or rgb_y < 0 or rgb_y >= 1080:
+            rospy.logerr("RGB pixel is out of bounds.")
+            return -1
+        
         # Step 1: Normalize the RGB pixel coordinates
         normalized_rgb_point = np.linalg.inv(RGB_INTRINSICS).dot([rgb_x, rgb_y, 1])
         
