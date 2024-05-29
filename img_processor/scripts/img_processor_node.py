@@ -1,23 +1,29 @@
-# required transformers-4.27.4 and huggingface-hub-0.16.4
+# using transformers-4.27.4 and huggingface-hub-0.16.4
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues
 
 import rospy
-from sensor_msgs.msg import Image as msg_img
+from sensor_msgs.msg import Image as MsgImg
 import message_filters
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import os
+import time
 import shutil
 import numpy as np
-import open3d as o3d
 import imageio
-import matplotlib.pyplot as plt
 import requests
-import time
-from PIL import Image
-from io import BytesIO
+from PIL import Image as PilImg
 from lang_sam import LangSAM
+from process_helper import ProcessingResults
+from process_helper import map_rgb_to_depth
 
+# Suppress unimportant messages printing to the console
+import warnings
+from transformers import logging
+
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
+logging.set_verbosity_error()
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
@@ -31,7 +37,7 @@ SAVE_FOLDER_NAME = 'kinect_images'
 PROCESS_IMAGES = True
 
 # Processing frequency
-PROCESSING_RATE = 1 # in Hz
+PROCESSING_RATE = 0.2 # in Hz
 
 # Select whether images should save or not
 SAVE_IMAGES = False
@@ -39,21 +45,8 @@ SAVE_IMAGES = False
 # Frequency of images being saved
 SAVE_RATE = 1 # in Hz
 
-# --------------------------------------------------------------------------------------------------------------------
-
-# --------------------------------------- Camera calibration constants -----------------------------------------------
-# Intrinsic parameters
-DEPTH_INTRINSICS = np.array([[366.193, 0, 256.684],
-                             [0, 366.193, 207.085],
-                             [0, 0, 1]])
-DEPTH_DIST_COEFFS = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
-
-RGB_INTRINSICS = np.array([[1081.37, 0, 959.5],
-                           [0, 1081.37, 539.5],
-                           [0, 0, 1]])
-
-R = np.eye(3)  # Rotation matrix (3x3)
-T = np.array([0, 0, 0])  # Translation vector (3x1)
+# This specifies the prompt which the model masks
+PROMPT = "monitor"
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -65,17 +58,11 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 # Calculate the save interval in seconds
 SAVE_INTERVAL = 1.0 / SAVE_RATE
 
-EXTRINSIC_MATRIX = np.eye(4)
-EXTRINSIC_MATRIX[:3, :3] = R
-EXTRINSIC_MATRIX[:3, 3] = T
-
 # --------------------------------------------------------------------------------------------------------------------
 
 class ImageSaverProcessor:
     def __init__(self):
         self.bridge = CvBridge()
-
-        self.pcd = o3d.geometry.PointCloud()
 
         # Clear the save directory
         if SAVE_IMAGES:
@@ -83,14 +70,15 @@ class ImageSaverProcessor:
 
         # Initialize node
         rospy.init_node('image_saver_processor', anonymous=True)
+        rospy.on_shutdown(self.cleanup)
 
         # for file saving
         self.last_save_time = rospy.Time.now()
         self.save_count = 1
 
         # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', msg_img)
-        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', msg_img)
+        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
+        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', MsgImg)
 
         # Synchronize the topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
@@ -99,6 +87,9 @@ class ImageSaverProcessor:
         # Initialize images
         self.rgb_image = None
         self.depth_image = None
+
+        # Initialize model
+        self.model = LangSAM(sam_type = "vit_b")
 
         # Set up a timers to call save and process functions
         if PROCESS_IMAGES:
@@ -148,51 +139,65 @@ class ImageSaverProcessor:
 
             rospy.loginfo(f"Saved images at index" + str(self.save_count).zfill(6))
 
-    def map_rgb_to_depth(self, rgb_x, rgb_y, depth_image):
-        """Map an RGB pixel to the corresponding depth pixel and retrieve the depth value."""
-        # Step 1: Normalize the RGB pixel coordinates
-        normalized_rgb_point = np.linalg.inv(RGB_INTRINSICS).dot([rgb_x, rgb_y, 1])
-        
-        # Step 2: Transform the normalized point to the depth camera coordinate system
-        point_3d_rgb = np.array([normalized_rgb_point[0], normalized_rgb_point[1], 1, 1])
-        point_3d_depth = np.linalg.inv(EXTRINSIC_MATRIX).dot(point_3d_rgb)
-        point_3d_depth /= point_3d_depth[3]  # Normalize homogeneous coordinates
-        
-        # Step 3: Project the 3D point to the 2D depth image plane
-        x_d = (point_3d_depth[0] * DEPTH_INTRINSICS[0, 0] / point_3d_depth[2]) + DEPTH_INTRINSICS[0, 2]
-        y_d = (point_3d_depth[1] * DEPTH_INTRINSICS[1, 1] / point_3d_depth[2]) + DEPTH_INTRINSICS[1, 2]
-        
-        # Step 4: Undistort the depth point
-        undistorted_depth_point = cv2.undistortPoints(np.array([[x_d, y_d]], dtype=np.float32), DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, P=DEPTH_INTRINSICS)
-        depth_x, depth_y = undistorted_depth_point[0, 0]
-        
-        # Step 5: Retrieve the depth value
-        if 0 <= int(depth_x) < depth_image.shape[1] and 0 <= int(depth_y) < depth_image.shape[0]:
-            depth_value = depth_image[int(depth_y), int(depth_x)]
-            return depth_value
-        else:
-            rospy.logerr("The computed depth pixel is out of bounds.")
-            return -1
 
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
             rospy.loginfo("Processing images")
+            try:
+                # -----------------------------Process Images----------------------------------
+                
+                # convert image to PIL format and resize
+                image_pil = PilImg.fromarray(self.rgb_image)
+                w, h = image_pil.size
+                new_w, new_h = w // 1, h // 1
+                image_pil = image_pil.resize((new_w, new_h), PilImg.ANTIALIAS)
 
-            # -----------------------------Process Images----------------------------------
-            
-            rgb_x = 960
-            rgb_y = 540
-            
-            # Calculate corresponding depth value of from RGB pixel coordinates
-            depth_val = self.map_rgb_to_depth(rgb_x, rgb_y, self.depth_image)
-            
-            rospy.loginfo("The depth value for the point (" + str(rgb_x) + ", " + str(rgb_y) + ") is " + str(depth_val) + "mm.")
+                # Save start time (to evaluate process time)
+                time_start = time.time()
+                masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
+                rospy.loginfo(f"inference time: {time.time() - time_start}")
+
+                if len(masks) == 0:
+                    # If no objects detected
+                    rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
+
+                else:
+                    # If at least one object detected
+
+                    # Create results object
+                    results = ProcessingResults(self.rgb_image, masks, boxes, phrases, logits)
+
+                    # Print the bounding boxes, phrases, and logits
+                    results.print_bounding_boxes()
+                    results.print_detected_phrases()
+                    results.print_logits()
+
+                    # Display the original image and masks side by side
+                    results.display_image_with_masks()
+
+                    # Display the image with bounding boxes and confidence scores
+                    results.display_image_with_boxes()
+
+
+                    rgb_x = 960
+                    rgb_y = 540
+                    
+                    # Calculate corresponding depth value of from RGB pixel coordinates
+                    depth_val = map_rgb_to_depth(rgb_x, rgb_y, self.depth_image)
+                    
+                    rospy.loginfo("The depth value for the point (" + str(rgb_x) + ", " + str(rgb_y) + ") is " + str(depth_val) + "mm.")
+
+            except (requests.exceptions.RequestException, IOError) as e:
+                rospy.logerr(f"Error: {e}")
             
             # -----------------------------------------------------------------------------
 
             # Reset images after processing
             self.rgb_image = None
             self.depth_image = None
+
+    def cleanup(self):
+        rospy.loginfo("Shutting down Image Processor Node")
 
     def spin(self):
         rospy.spin()
@@ -205,3 +210,4 @@ if __name__ == '__main__':
         pass
 
 # TODO add image processing to find objects in frame
+# TODO process the distance to the center of each object
