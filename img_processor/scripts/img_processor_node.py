@@ -201,8 +201,9 @@ class ImageSaverProcessor:
                         # add mask data to array for publishing
                         temp_mask = MaskData()
                         temp_mask.phrase = phrase
-                        temp_mask.centroid = Point(centroid[0],centroid[1],0)
-                        temp_mask.depth = depth_val
+                        temp_mask.centroid = Point(centroid[0], centroid[1], depth_val) # the z part of the point is depth (in mm)
+                                                                                        # this should not be confused for a point in
+                                                                                        # 3d cartesian space, as x and y are in px
                         temp_mask.logit = logit
                         mask_image = (mask * 255).astype(np.uint8)
                         temp_mask.mask = self.bridge.cv2_to_imgmsg(mask_image, encoding="mono8")
