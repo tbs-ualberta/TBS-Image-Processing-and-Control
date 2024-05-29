@@ -44,43 +44,6 @@ class ProcessingResults:
         self.phrases = phrases
         self.logits = logits
 
-    def display_image_with_masks(self):
-        num_masks = len(self.masks)
-
-        fig, axes = plt.subplots(1, num_masks + 1, figsize=(15, 5))
-        axes[0].imshow(self.image)
-        axes[0].set_title("Original Image")
-        axes[0].axis('off')
-
-        for i, mask_np in enumerate(self.masks):
-            axes[i+1].imshow(mask_np, cmap='gray')
-            axes[i+1].set_title(f"Mask {i+1}")
-            axes[i+1].axis('off')
-
-        plt.tight_layout()
-        plt.show()
-
-    def display_image_with_boxes(self):
-        fig, ax = plt.subplots()
-        ax.imshow(self.image)
-        ax.set_title("Image with Bounding Boxes")
-        ax.axis('off')
-
-        for box, logit in zip(self.boxes, self.logits):
-            x_min, y_min, x_max, y_max = box
-            confidence_score = round(logit.item(), 2)  # Convert logit to a scalar before rounding
-            box_width = x_max - x_min
-            box_height = y_max - y_min
-
-            # Draw bounding box
-            rect = plt.Rectangle((x_min, y_min), box_width, box_height, fill=False, edgecolor='red', linewidth=2)
-            ax.add_patch(rect)
-
-            # Add confidence score as text
-            ax.text(x_min, y_min, f"Confidence: {confidence_score}", fontsize=8, color='red', verticalalignment='top')
-
-        plt.show()
-
     def find_object_centroids(self):
         # self.masks is a tensor array of boolean values [1080, 1920]
         centroids = []

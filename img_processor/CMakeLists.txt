@@ -10,6 +10,22 @@ project(img_processor)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
+  geometry_msgs
+  sensor_msgs
+  message_generation
+)
+
+add_message_files(
+  FILES
+  MaskArray.msg
+  MaskData.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  sensor_msgs
 )
 
 ###################################
@@ -22,10 +38,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES power_pc
-#  CATKIN_DEPENDS rospy std_msgs
-#  DEPENDS system_lib
+  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs sensor_msgs
 )
 
 ###########

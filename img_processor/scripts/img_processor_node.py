@@ -3,6 +3,8 @@
 
 import rospy
 from sensor_msgs.msg import Image as MsgImg
+from geometry_msgs.msg import Point
+from img_processor.msg import MaskArray, MaskData
 import message_filters
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -65,17 +67,12 @@ class ImageSaverProcessor:
     def __init__(self):
         self.bridge = CvBridge()
 
-        # Clear the save directory
-        if SAVE_IMAGES:
-            self.clear_directory(SAVE_PATH)
-
         # Initialize node
         rospy.init_node('image_saver_processor', anonymous=True)
         rospy.on_shutdown(self.cleanup)
 
-        # for file saving
-        self.last_save_time = rospy.Time.now()
-        self.save_count = 1
+        # Define publishers for masks, centroid locations, and centroid depths
+        self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
 
         # Define subscribers for depth and rgb topics
         self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
@@ -89,10 +86,18 @@ class ImageSaverProcessor:
         self.rgb_image = None
         self.depth_image = None
 
+        # Clear the save directory
+        if SAVE_IMAGES:
+            self.clear_directory(SAVE_PATH)
+
+        # For file saving
+        self.last_save_time = rospy.Time.now()
+        self.save_count = 1
+
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
 
-        # Set up a timers to call save and process functions
+        # Set up timers to call save and process functions
         if PROCESS_IMAGES:
             self.processing_timer = rospy.Timer(rospy.Duration(PROCESSING_INTERVAL), self.process_images)
         if SAVE_IMAGES:
@@ -146,7 +151,9 @@ class ImageSaverProcessor:
             # rospy.loginfo("Processing images")
             try:
                 # -----------------------------Process Images----------------------------------
-                
+
+                mask_array = MaskArray() # for publishing mask and centroid data
+
                 # convert image to PIL format and resize
                 image_pil = PilImg.fromarray(self.rgb_image)
                 w, h = image_pil.size
@@ -159,7 +166,7 @@ class ImageSaverProcessor:
                 # Calculate masks and bounding boxes for images
                 masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
 
-                # Clear the screen for new output
+                # Clear the console for new output
                 os.system('clear')
                 rospy.logdebug(f"Inference time: {time.time() - time_start}")
 
@@ -177,19 +184,33 @@ class ImageSaverProcessor:
                     depth_vals = []
                     centroids = results.find_object_centroids()
                     centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+
                     # Calculate corresponding depth values from RGB pixel coordinates
                     depth_vals = [map_rgb_to_depth(x, y, self.depth_image) for x, y in centroids_as_pixels]
 
+                    # Print calculated data to console
                     print("-------------------------------------------------------------------------------------------------")
-
-                    # print calculated values
-                    for i, (centroid, depth_val, phrase, logit) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
-                        rospy.loginfo(f"Mask {i+1}: {phrase} (confidence of {logit}")
-                        rospy.loginfo(f"Centroid at: {centroid}, Depth value: {depth_val} mm")
+                    for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
+                        # Print info
+                        rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
+                        rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
 
-                    # TODO add realtime visualization of the masking algorithm (over rgb image)
-                    # - also add the centroids and depths of each centroid on the image
+                    # Publish calculated data to ROS topic
+                    for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, results.masks_np):
+                        # add mask data to array for publishing
+                        temp_mask = MaskData()
+                        temp_mask.phrase = phrase
+                        temp_mask.centroid = Point(centroid[0],centroid[1],0)
+                        temp_mask.depth = depth_val
+                        temp_mask.logit = logit
+                        mask_image = (mask * 255).astype(np.uint8)
+                        temp_mask.mask = self.bridge.cv2_to_imgmsg(mask_image, encoding="mono8")
+
+                        mask_array.data.append(temp_mask)
+
+                    # publish centroid array
+                    self.mask_pub.publish(mask_array)
 
                 rospy.loginfo(f"Total processing time: {time.time() - time_start}")
                 print("-------------------------------------------------------------------------------------------------")

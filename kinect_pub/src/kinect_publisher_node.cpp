@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     ros::Publisher depth_norm_pub = nh.advertise<sensor_msgs::Image>("/kinect2/depth_norm", 1);
     ros::Publisher ir_raw_pub = nh.advertise<sensor_msgs::Image>("/kinect2/ir_raw", 1);
     ros::Publisher ir_norm_pub = nh.advertise<sensor_msgs::Image>("/kinect2/ir_norm", 1);
-    // ros::Publisher reg_pub = nh.advertise<sensor_msgs::Image>("/kinect2/reg", 1); // For registration
+    ros::Publisher reg_pub = nh.advertise<sensor_msgs::Image>("/kinect2/reg", 1); // For registration
 
     // Initialize Kinect
     libfreenect2::Freenect2 freenect2;
@@ -62,13 +62,12 @@ int main(int argc, char **argv)
     ROS_INFO(srl_msg.c_str());
     ROS_INFO(frmwr_msg.c_str());
 
-    /*
     // For registration; this only initializes the registration object, and does not do any processing
     libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
     libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
     libfreenect2::Frame bigdepth(1920, 1080 + 2, 4);
     int colour_depth_ind [512 * 424];
-    */
+    
 
     ros::Rate loop_rate(LOOP_RATE);
 
@@ -117,8 +116,7 @@ int main(int argc, char **argv)
         sensor_msgs::ImagePtr ir_norm_msg = cv_bridge::CvImage(std_msgs::Header(), "32FC1", ir_normalized).toImageMsg();
         ir_norm_pub.publish(ir_norm_msg);
 
-        /*
-        // For registration
+
         // Process registered frame
         registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind);
 
@@ -126,7 +124,7 @@ int main(int argc, char **argv)
         cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);
         sensor_msgs::ImagePtr reg_msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", reg_image).toImageMsg();
         reg_pub.publish(reg_msg);
-        */
+        
         
         listener.release(frames);
 
@@ -137,7 +135,7 @@ int main(int argc, char **argv)
     dev->stop();
     dev->close();
 
-    // delete registration; // For registration
+    delete registration; // For registration
 
     return 0;
 }
