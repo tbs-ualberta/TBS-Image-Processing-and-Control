@@ -13,7 +13,7 @@ DISPLAY_DEPTH = True
 DISPLAY_IR = True
 
 # Select whether to displayed normalized depth image (if false output will be black or white, not greyscale)
-DISPLAY_NORM_DEPTH = True
+DISPLAY_NORM = True
 
 # Select whether to display registered image
 DISPLAY_REG = True
@@ -29,7 +29,6 @@ DISPLAY_RATE = 20 # in Hz
 DISPLAY_INTERVAL = 1.0 / DISPLAY_RATE
 
 # --------------------------------------------------------------------------------------------------------------------
-
 
 import rospy
 from sensor_msgs.msg import Image
@@ -50,7 +49,7 @@ class ImageSaverProcessor:
         self.reg_sub = message_filters.Subscriber('/kinect2/reg', Image)
 
         # Choose which topic to subscribe to, depending on whether normalization should be displayed
-        if DISPLAY_NORM_DEPTH:
+        if DISPLAY_NORM:
             self.depth_sub = message_filters.Subscriber('/kinect2/depth_norm', Image)
         else:
             self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', Image)
