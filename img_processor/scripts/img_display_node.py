@@ -12,7 +12,7 @@ DISPLAY_DEPTH = True
 # Select whether to display infrared image
 DISPLAY_IR = True
 
-# Select whether to displayed normalized depth image (if false output will be black or white, not greyscale)
+# Select whether to display normalized depth image (if false output will be black or white, not greyscale)
 DISPLAY_NORM = True
 
 # Select whether to display registered image
@@ -36,7 +36,7 @@ import message_filters
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
-class ImageSaverProcessor:
+class ImageDisplay:
     def __init__(self):
         self.bridge = CvBridge()
 
@@ -97,13 +97,13 @@ class ImageSaverProcessor:
             rospy.logerr(f"Failed to convert images: {e}")
         except Exception as e:
             rospy.logerr(f"Error in callback_no_mask: {e}")
-    
+
     def spin(self):
         rospy.spin()
 
 if __name__ == '__main__':
     try:
-        image_saver_processor = ImageSaverProcessor()
-        image_saver_processor.spin()
+        image_display = ImageDisplay()
+        image_display.spin()
     except rospy.ROSInterruptException:
         pass

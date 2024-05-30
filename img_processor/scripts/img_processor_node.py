@@ -12,24 +12,9 @@ PROMPT = "person" # multiple objects can be detected using a '.' as a separator
 # Specifies target. This allows for detection of multiple objects but only targetting of one
 TARGET = "person" # must be contained in the prompt
 
-# Selects whether files should process or not
-PROCESS_IMAGES = True
-
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
 # included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
 PROCESSING_RATE = 2 # in Hz
-
-# Directory to save images
-SAVE_PATH = r'/home/wmm'
-
-# Save folder name
-SAVE_FOLDER_NAME = 'kinect_images'
-
-# Select whether images should save or not
-SAVE_IMAGES = False
-
-# Frequency of images being saved
-SAVE_RATE = 1 # in Hz
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -37,9 +22,6 @@ SAVE_RATE = 1 # in Hz
 
 # Calculate the process interval in seconds
 PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
-
-# Calculate the save interval in seconds
-SAVE_INTERVAL = 1.0 / SAVE_RATE
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -49,13 +31,10 @@ from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
 from img_processor.msg import MaskArray, MaskData
 import message_filters
-import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import os
 import time
-import shutil
 import numpy as np
-import imageio
 import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
@@ -68,7 +47,7 @@ from transformers import logging
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 logging.set_verbosity_error()
-class ImageSaverProcessor:
+class ImageProcessor:
     def __init__(self):
         self.bridge = CvBridge()
 
@@ -96,23 +75,12 @@ class ImageSaverProcessor:
         self.rgb_image = None
         self.depth_image = None
 
-        # Clear the save directory
-        if SAVE_IMAGES:
-            self.clear_directory(SAVE_PATH)
-
-        # For file saving
-        self.last_save_time = rospy.Time.now()
-        self.save_count = 1
-
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
 
-        # Set up timers to call save and process functions
-        if PROCESS_IMAGES:
-            self.processing_timer = rospy.Timer(rospy.Duration(PROCESSING_INTERVAL), self.process_images)
-        if SAVE_IMAGES:
-            self.save_timer = rospy.Timer(rospy.Duration(SAVE_INTERVAL), self.save_images)
-
+        # Set up timers to call process function
+        self.processing_timer = rospy.Timer(rospy.Duration(PROCESSING_INTERVAL), self.process_images)
+        
         rospy.loginfo("Image Processor Node Started")
 
     def callback(self, rgb_msg, depth_msg):
@@ -122,39 +90,6 @@ class ImageSaverProcessor:
             self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert images: {e}")
-
-    def clear_directory(self, path):
-        # Remove all files in the save_folder_name directory (if it exists)
-        if os.path.isdir(os.path.join(path, SAVE_FOLDER_NAME)):
-            shutil.rmtree(os.path.join(path, SAVE_FOLDER_NAME))
-            rospy.loginfo("Image Directory Cleared")
-
-        # create new folders to save to
-        os.chdir(path)
-        os.mkdir(SAVE_FOLDER_NAME)
-        os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME))
-        # only makes folder if saving for corresponding image type is ON
-        os.mkdir('rgb')
-        os.mkdir('depth')
-    
-    def save_images(self, event):
-        # Saves images to computer
-        # TODO this skips images a lot, so it should be changed, but it works for now
-        if self.rgb_image is not None and self.depth_image is not None:
-            # rgb
-            os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "rgb"))
-            path_str_rgb = "rgb_" + str(self.save_count).zfill(6) + ".png"
-            cv2.imwrite(str(path_str_rgb), self.rgb_image)
-
-            # depth
-            os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "depth"))
-            path_str_depth = "depth_" + str(self.save_count).zfill(6) + ".tiff"
-            imageio.imwrite(str(path_str_depth), self.depth_image)
-
-            self.save_count += 1
-
-            rospy.loginfo(f"Saved images at index" + str(self.save_count).zfill(6))
-
 
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
@@ -276,8 +211,8 @@ class ImageSaverProcessor:
 
 if __name__ == '__main__':
     try:
-        image_saver_processor = ImageSaverProcessor()
-        image_saver_processor.spin()
+        image_processor = ImageProcessor()
+        image_processor.spin()
     except rospy.ROSInterruptException:
         pass
 
