@@ -1,2 +1,3 @@
 std_msgs/Header header
-MaskData[] data
+MaskData[] mask_data
+sensor_msgs/Image rgb_img

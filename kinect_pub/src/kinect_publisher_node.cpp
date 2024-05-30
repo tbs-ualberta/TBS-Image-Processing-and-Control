@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
 
         // Process registered frame
-        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind);
+        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind); // TODO this should normalize the image before registering
 
         // Convert registered frame to ROS message and publish
         cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);

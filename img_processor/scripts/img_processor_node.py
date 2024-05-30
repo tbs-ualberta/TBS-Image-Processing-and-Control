@@ -198,7 +198,7 @@ class ImageSaverProcessor:
 
                     # Publish calculated data to ROS topic
                     for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, results.masks_np):
-                        # add mask data to array for publishing
+                        # Add mask data to array for publishing
                         temp_mask = MaskData()
                         temp_mask.phrase = phrase
                         temp_mask.centroid = Point(centroid[0], centroid[1], depth_val) # the z part of the point is depth (in mm)
@@ -206,11 +206,13 @@ class ImageSaverProcessor:
                                                                                         # 3d cartesian space, as x and y are in px
                         temp_mask.logit = logit
                         mask_image = (mask * 255).astype(np.uint8)
-                        temp_mask.mask = self.bridge.cv2_to_imgmsg(mask_image, encoding="mono8")
+                        temp_mask.mask = self.bridge.cv2_to_imgmsg(mask_image, encoding="mono8") 
 
-                        mask_array.data.append(temp_mask)
+                        mask_array.mask_data.append(temp_mask)
 
-                    # publish centroid array
+                    # Add rgb image to array data
+                    mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
+                    # Publish centroid array
                     self.mask_pub.publish(mask_array)
 
                 rospy.loginfo(f"Total processing time: {time.time() - time_start}")
