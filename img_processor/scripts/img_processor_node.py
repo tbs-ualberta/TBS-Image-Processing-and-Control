@@ -212,6 +212,7 @@ class ImageSaverProcessor:
 
                     # Add rgb image to array data
                     mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
+                    
                     # Publish centroid array
                     self.mask_pub.publish(mask_array)
 
