@@ -73,7 +73,7 @@ class ImageSaverProcessor:
         self.bridge = CvBridge()
 
         # Initialize node
-        rospy.init_node('image_saver_processor', anonymous=True)
+        rospy.init_node('image_processor', anonymous=True)
         rospy.on_shutdown(self.cleanup)
 
         # Define publisher for mask data
