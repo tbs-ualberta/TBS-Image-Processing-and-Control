@@ -22,15 +22,13 @@ class ImageSaverProcessor:
         self.mask_image = None # RGB image accompanying mask data
 
         # Define subscriber for masks
-        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.process_mask_data)
+        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.convert_mask_data)
 
-        rospy.loginfo("Image Display Node Started")
+        rospy.loginfo("Mask Display Node Started")
 
-    def process_mask_data(self, mask_data):
+    def convert_mask_data(self, mask_data):
         try:
             # This will display the mask data anytime it is called
-            rospy.loginfo("Processing mask data")
-            # Extract masks
 
             # Empty arrays
             self.phrases = []
@@ -44,7 +42,7 @@ class ImageSaverProcessor:
             for temp_mask in mask_data.mask_data:
                 temp_phrase = temp_mask.phrase
                 centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
-                depth_val = temp_mask.centroid.z
+                depth_val = temp_mask.centroid.z / 1000
                 temp_logit = temp_mask.logit
 
                 mask_img = self.bridge.imgmsg_to_cv2(temp_mask.mask, desired_encoding="mono8")
@@ -56,11 +54,8 @@ class ImageSaverProcessor:
                 self.logits.append(temp_logit)
                 self.masks.append(mask_img)
 
-
             # Convert rgb image to OpenCV format
             self.mask_image = self.bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
-
-            print(type(self.mask_image))
 
             self.display_masks()
 
@@ -77,22 +72,22 @@ class ImageSaverProcessor:
             
             overlay = self.mask_image.copy()
             alpha = 0.5  # Transparency factor
+            
+            mask_sum = np.zeros_like(self.mask_image)
 
-            if overlay.size == 0:
-                rospy.logwarn("Overlay image has zero size, skipping display")
-                return
+            # Convert mask to single array. This allows for even application of colour and the image is not too darkened by multiple masks being overlaid.
+            for mask, logit in zip(self.masks, self.logits):
+                mask_scaled = np.zeros_like(self.mask_image)
+                # Scale proportionally to confidence value
+                scale_val = logit*225
+                mask_scaled[mask] = [0, scale_val, 0]
+                # Combine arrays
+                mask_sum = np.maximum(mask_sum, mask_scaled)
 
-            for mask, centroid, phrase, depth in zip(self.masks, self.centroids, self.phrases, self.depth_vals):
-                if overlay is None:
-                    rospy.logwarn("Overlay is None, breaking loop")
-                    break
+            # Overlay mask on the image
+            cv2.addWeighted(mask_sum, alpha, overlay, 1 - alpha, 0, overlay)
 
-                mask_rgb = np.zeros_like(self.mask_image)
-                mask_rgb[mask] = [0, 255, 0]  # Green color for mask
-
-                # Overlay mask on the image
-                cv2.addWeighted(mask_rgb, alpha, overlay, 1 - alpha, 0, overlay)
-
+            for centroid, phrase, depth, logit in zip(self.centroids, self.phrases, self.depth_vals, self.logits):
                 # Draw centroid
                 cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
 
@@ -100,16 +95,9 @@ class ImageSaverProcessor:
                 cv2.putText(overlay, f"{phrase}, {depth:.2f}m", (centroid[0] + 10, centroid[1] - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
-            if overlay is not None:
-                if overlay.size > 0:
-                    rospy.loginfo(f"Displaying overlay with size: {overlay.shape}")
-                    cv2.imshow("Mask Overlay Image", overlay)
-                    cv2.waitKey(1)
-                    pass
-                else:
-                    rospy.logwarn("Overlay image has zero size, skipping display")
-            else:
-                rospy.logwarn("Overlay image is None, skipping display")
+            # Display image in window
+            cv2.imshow("Mask Overlay Image", overlay)
+            cv2.waitKey(1)
 
         except Exception as e:
             rospy.logerr(f"Error displaying masks: {e}")
@@ -123,6 +111,3 @@ if __name__ == '__main__':
         image_saver_processor.spin()
     except rospy.ROSInterruptException:
         pass
-
-# TODO figure out why the registered image is the same as the rgb image
-# TODO add visualization for the masking algorithm, centroid locations, and depth values

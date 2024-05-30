@@ -40,7 +40,7 @@ PROCESS_IMAGES = True
 
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
 # included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
-PROCESSING_RATE = 1 # in Hz
+PROCESSING_RATE = 20 # in Hz
 
 # Select whether images should save or not
 SAVE_IMAGES = False
@@ -49,7 +49,8 @@ SAVE_IMAGES = False
 SAVE_RATE = 1 # in Hz
 
 # This specifies the prompt which the model masks
-PROMPT = "chair . human"
+PROMPT = "person white shirt"
+# PROMPT = "cat"
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -174,6 +175,12 @@ class ImageSaverProcessor:
                     # If no objects detected
                     rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
 
+                    # Add rgb image to array data
+                    mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
+
+                    # Publish centroid array
+                    self.mask_pub.publish(mask_array)
+
                 else:
                     # If at least one object detected
 
@@ -196,9 +203,8 @@ class ImageSaverProcessor:
                         rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
 
-                    # Publish calculated data to ROS topic
+                    # Add mask data to array for publishing
                     for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, results.masks_np):
-                        # Add mask data to array for publishing
                         temp_mask = MaskData()
                         temp_mask.phrase = phrase
                         temp_mask.centroid = Point(centroid[0], centroid[1], depth_val) # the z part of the point is depth (in mm)
@@ -212,8 +218,8 @@ class ImageSaverProcessor:
 
                     # Add rgb image to array data
                     mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
-                    
-                    # Publish centroid array
+
+                    # Publish array
                     self.mask_pub.publish(mask_array)
 
                 rospy.loginfo(f"Total processing time: {time.time() - time_start}")
