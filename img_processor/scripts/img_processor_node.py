@@ -1,32 +1,7 @@
+# Authored by: Andor Siegers
+
 # using transformers-4.27.4 and huggingface-hub-0.16.4
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues
-
-import rospy
-from std_msgs.msg import Int32, Float32
-from sensor_msgs.msg import Image as MsgImg
-from geometry_msgs.msg import Point
-from img_processor.msg import MaskArray, MaskData
-import message_filters
-import cv2
-from cv_bridge import CvBridge, CvBridgeError
-import os
-import time
-import shutil
-import numpy as np
-import imageio
-import requests
-from PIL import Image as PilImg
-from lang_sam import LangSAM
-from process_helper import ProcessingResults
-from process_helper import map_rgb_to_depth
-
-# Suppress unimportant messages printing to the console
-import warnings
-from transformers import logging
-
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
-logging.set_verbosity_error()
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
@@ -68,6 +43,31 @@ SAVE_INTERVAL = 1.0 / SAVE_RATE
 
 # --------------------------------------------------------------------------------------------------------------------
 
+import rospy
+from std_msgs.msg import Int16, Float32
+from sensor_msgs.msg import Image as MsgImg
+from geometry_msgs.msg import Point
+from img_processor.msg import MaskArray, MaskData
+import message_filters
+import cv2
+from cv_bridge import CvBridge, CvBridgeError
+import os
+import time
+import shutil
+import numpy as np
+import imageio
+import requests
+from PIL import Image as PilImg
+from lang_sam import LangSAM
+from process_helper import ProcessingResults
+from process_helper import map_rgb_to_depth
+import warnings
+from transformers import logging
+
+# Suppress unimportant messages printing to the console
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
+logging.set_verbosity_error()
 class ImageSaverProcessor:
     def __init__(self):
         self.bridge = CvBridge()
@@ -80,8 +80,8 @@ class ImageSaverProcessor:
         self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
 
         # Publish position data to ROS topics for use with control algorithm
-        self.target_pub_x = rospy.Publisher("process/target/x", Int32, queue_size=10) # in px
-        self.target_pub_y = rospy.Publisher("process/target/y", Int32, queue_size=10) # in px
+        self.target_pub_x = rospy.Publisher("process/target/x", Int16, queue_size=10) # in px
+        self.target_pub_y = rospy.Publisher("process/target/y", Int16, queue_size=10) # in px
         self.target_pub_depth = rospy.Publisher("process/target/depth", Float32, queue_size=10) # in mm
 
         # Define subscribers for depth and rgb topics

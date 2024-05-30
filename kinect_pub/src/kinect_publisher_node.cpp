@@ -1,3 +1,4 @@
+// Authored by: Andor Siegers
 // RUN BEFORE STARTING ROS PROGRAMS: source ~/catkin_ws/devel/setup.bash
 // THEN TO RUN NODE: rosrun kinect_pub kinect_pub_node
 
@@ -118,7 +119,7 @@ int main(int argc, char **argv)
 
 
         // Process registered frame
-        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind); // TODO this should normalize the image before registering
+        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind);
 
         // Convert registered frame to ROS message and publish
         cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);
