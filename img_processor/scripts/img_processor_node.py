@@ -2,6 +2,7 @@
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues
 
 import rospy
+from std_msgs.msg import Int32, Float32
 from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
 from img_processor.msg import MaskArray, MaskData
@@ -40,7 +41,7 @@ PROCESS_IMAGES = True
 
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
 # included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
-PROCESSING_RATE = 20 # in Hz
+PROCESSING_RATE = 2 # in Hz
 
 # Select whether images should save or not
 SAVE_IMAGES = False
@@ -49,8 +50,10 @@ SAVE_IMAGES = False
 SAVE_RATE = 1 # in Hz
 
 # This specifies the prompt which the model masks
-PROMPT = "person white shirt"
+PROMPT = "person"
 # PROMPT = "cat"
+
+TARGET = "person"
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -72,8 +75,13 @@ class ImageSaverProcessor:
         rospy.init_node('image_saver_processor', anonymous=True)
         rospy.on_shutdown(self.cleanup)
 
-        # Define publishers for masks, centroid locations, and centroid depths
+        # Define publisher for mask data
         self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
+
+        # Publish position data to ROS topics for use with control algorithm
+        self.target_pub_x = rospy.Publisher("process/target/x", Int32, queue_size=10) # in px
+        self.target_pub_y = rospy.Publisher("process/target/y", Int32, queue_size=10) # in px
+        self.target_pub_depth = rospy.Publisher("process/target/depth", Float32, queue_size=10) # in mm
 
         # Define subscribers for depth and rgb topics
         self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
@@ -181,6 +189,11 @@ class ImageSaverProcessor:
                     # Publish centroid array
                     self.mask_pub.publish(mask_array)
 
+                    # if object is not detected in frame, all values will be -1
+                    self.target_pub_x.publish(-1)
+                    self.target_pub_y.publish(-1)
+                    self.target_pub_depth.publish(-1)
+
                 else:
                     # If at least one object detected
 
@@ -219,8 +232,28 @@ class ImageSaverProcessor:
                     # Add rgb image to array data
                     mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
 
-                    # Publish array
+                    # Selects which object to target. This can be implemented in different ways,
+                    # but for now, it will just select the closest object.
+                    target_x = -1
+                    target_y = -1
+                    target_depth = -1
+                    min_depth = 100000
+                    
+                    # Find minimum depth of nearest target
+                    for temp_centroid, temp_phrase, temp_depth in zip(centroids_as_pixels, phrases, depth_vals):
+                        if TARGET in temp_phrase and temp_depth < min_depth:
+                            target_x = temp_centroid[0]
+                            target_y = temp_centroid[1]
+                            target_depth = temp_depth
+                            min_depth = temp_depth
+
+                    # Publish mask data
                     self.mask_pub.publish(mask_array)
+                    
+                    # Publish target values
+                    self.target_pub_x.publish(target_x)
+                    self.target_pub_y.publish(target_y)
+                    self.target_pub_depth.publish(target_depth)
 
                 rospy.loginfo(f"Total processing time: {time.time() - time_start}")
                 print("-------------------------------------------------------------------------------------------------")
