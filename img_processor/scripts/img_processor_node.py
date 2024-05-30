@@ -30,11 +30,12 @@ logging.set_verbosity_error()
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
-# Directory to save images
-SAVE_PATH = r'/home/wmm'
+# This specifies the prompt which the model masks
+PROMPT = "person" # multiple objects can be detected using a '.' as a separator
+# PROMPT = "cat"
 
-# Save folder name
-SAVE_FOLDER_NAME = 'kinect_images'
+# Specifies target. This allows for detection of multiple objects but only targetting of one
+TARGET = "person" # must be contained in the prompt
 
 # Selects whether files should process or not
 PROCESS_IMAGES = True
@@ -43,17 +44,17 @@ PROCESS_IMAGES = True
 # included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
 PROCESSING_RATE = 2 # in Hz
 
+# Directory to save images
+SAVE_PATH = r'/home/wmm'
+
+# Save folder name
+SAVE_FOLDER_NAME = 'kinect_images'
+
 # Select whether images should save or not
 SAVE_IMAGES = False
 
 # Frequency of images being saved
 SAVE_RATE = 1 # in Hz
-
-# This specifies the prompt which the model masks
-PROMPT = "person"
-# PROMPT = "cat"
-
-TARGET = "person"
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -282,5 +283,3 @@ if __name__ == '__main__':
 
 # TODO sometimes centroid point does not have depth value.
 # Maybe add algorithm to find closest point with depth info and use that (if no depth at exact pixel)?
-
-# TODO add registered image back in (depth mapped over rgb)
