@@ -1,7 +1,7 @@
 # Authored by: Andor Siegers
 
 # using transformers-4.27.4 and huggingface-hub-0.16.4
-# DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues
+# DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues when tested
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
@@ -88,7 +88,7 @@ class ImageProcessor:
             # Convert the rgb and depth images to OpenCV format
             self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
             self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
-            
+
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert images: {e}")
 
