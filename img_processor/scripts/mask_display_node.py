@@ -2,6 +2,7 @@
 
 import rospy
 from img_processor.msg import MaskArray, MaskData
+from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
@@ -23,6 +24,9 @@ class ImageSaverProcessor:
 
         # Define subscriber for masks
         self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.convert_mask_data)
+
+        # Define publisher to publish mask image
+        self.mask_img_pub = rospy.Publisher("process/mask_img", Image, queue_size=10)
 
         rospy.loginfo("Mask Display Node Started")
 
@@ -94,6 +98,9 @@ class ImageSaverProcessor:
                 # Put text for phrase and depth value
                 cv2.putText(overlay, f"{phrase}, {depth:.2f}m", (centroid[0] + 10, centroid[1] - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+            # Publish image to ROS topic for image saving
+            self.mask_img_pub.publish(self.bridge.cv2_to_imgmsg(overlay, encoding="bgr8"))
 
             # Display image in window
             cv2.imshow("Mask Overlay Image", overlay)

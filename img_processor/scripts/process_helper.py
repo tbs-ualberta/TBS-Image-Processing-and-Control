@@ -107,4 +107,3 @@ def map_rgb_to_depth(rgb_x, rgb_y, depth_image):
             return -1
             
 # --------------------------------------------------------------------------------------------------------------------
-# print("This file is purely for class and function definitions. Please run img_processor_node.py.")
