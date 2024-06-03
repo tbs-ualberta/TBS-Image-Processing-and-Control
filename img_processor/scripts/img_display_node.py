@@ -19,7 +19,7 @@ DISPLAY_NORM = True
 DISPLAY_REG = False
 
 # Select whether to display images from the USB webcam
-DISPLAY_USB = True
+DISPLAY_USB = False
 
 # Frequency of images being displayed
 DISPLAY_RATE = 20 # in Hz

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
-# Assumes: 640x480 image from webcam
+# Assumes: 640x480 image from webcam # Only affects image display
 
 import cv2
 import mediapipe as mp

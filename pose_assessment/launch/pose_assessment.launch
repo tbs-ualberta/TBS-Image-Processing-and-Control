@@ -12,5 +12,5 @@
     <param name="image_format" value="bgr8" />
   </node>
 
-  <node name="assess_pose_node" type="assess_pose_node.py" pkg="pose_assessment"/>
+  <node name="assess_pose_node" type="assess_pose_node.py" pkg="pose_assessment" output="screen"/>
 </launch>
