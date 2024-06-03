@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>pose_assess</name>
+  <name>pose_assessment</name>
   <version>0.0.0</version>
   <description>The pose_assess package</description>
 
