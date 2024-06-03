@@ -8,4 +8,4 @@ venv/
 
 # Ignore build folder
 /build/
-/.vscode
+/.vscode/
