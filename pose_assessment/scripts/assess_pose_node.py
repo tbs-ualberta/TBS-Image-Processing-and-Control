@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
-# Assumes: 640x480 image from webcam # Only affects image display
+# Assumes: 640x480 image from webcam
 
 import cv2
 import mediapipe as mp
@@ -114,8 +114,9 @@ class PoseAssess:
             self.left_arm_ang_pub.publish(left_angle)
             self.right_arm_ang_pub.publish(right_angle)
 
-            # Display angles on the image
+            
             if DISPLAY_OUTPUT:
+                # Display angle values on the image
                 cv2.putText(image, str(int(left_angle)),
                             tuple(np.multiply(left_elbow, [640, 480]).astype(int)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2, cv2.LINE_AA)
