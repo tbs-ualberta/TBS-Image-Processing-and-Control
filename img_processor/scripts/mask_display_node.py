@@ -83,8 +83,8 @@ class ImageSaverProcessor:
             for mask, logit in zip(self.masks, self.logits):
                 mask_scaled = np.zeros_like(self.mask_image)
                 # Scale proportionally to confidence value
-                scale_val = logit*225
-                mask_scaled[mask] = [0, scale_val, 0]
+                scaled_val = logit * 225
+                mask_scaled[mask] = [0, scaled_val, 0] # change these values to change colour
                 # Combine arrays
                 mask_sum = np.maximum(mask_sum, mask_scaled)
 

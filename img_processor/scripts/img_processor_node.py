@@ -33,11 +33,13 @@ from img_processor.msg import MaskArray, MaskData
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 import os
+import sys
 import time
 import numpy as np
 import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
+sys.path.append(os.path.join(os.path.dirname(__file__)))
 from process_helper import ProcessingResults
 from process_helper import map_rgb_to_depth
 import warnings
