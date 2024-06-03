@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>img_processor</name>
+  <name>object_detection</name>
   <version>0.1.0</version>
   <description>Processes depth, rgb, and ir images taken from ROS topics</description>
 
