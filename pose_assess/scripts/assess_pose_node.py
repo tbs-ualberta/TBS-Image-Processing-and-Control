@@ -1,6 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import rospy
 
 # Initialize MediaPipe pose
 mp_pose = mp.solutions.pose
