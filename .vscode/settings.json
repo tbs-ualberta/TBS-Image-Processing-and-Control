@@ -1,9 +1,0 @@
-{
-    "python.defaultInterpreterPath": "/home/wmm/miniconda3/envs/abed/bin/python",
-    "python.analysis.extraPaths": [
-        "./img_processor/scripts/lang-segment-anything"
-    ],
-    "cmake.configureOnOpen": false
-    
-}
-  

@@ -1,6 +1,6 @@
 # Introduction
 
-This document describes the implementation of pose assessment into the Wheeled Mobile Manipulator (WMM) project using Google’s MediaPipe API and a generic USB webcam. This will allow the WMM system to analyze the pose of the user, and make decisions based on this analysis. The preceding text will explain how this is implemented, and give setup steps.
+This file describes the implementation of pose assessment into the Wheeled Mobile Manipulator (WMM) project using Google’s MediaPipe API and a generic USB webcam. This will allow the WMM system to analyze the pose of the user, and make decisions based on this analysis. The preceding text will explain how this is implemented, and give setup steps.
 
 ## Assumptions
 
@@ -10,13 +10,13 @@ The steps in this document were done with the following assumptions:
 - ROS version: Noetic
 - Python version: 3.8.10
 - GCC version: 9.4.0
-- Camera: Xbox Kinect V2 (Xbox One)
+- Camera: Generic USB Webcam
 
 # usb_cam Setup
 
 To start, a USB webcam is connected to the computer. This will be mounted on the WMM facing the user and its output will be used for pose assessment. This needs to be integrated into ROS. A package called “usb_cam” can be used for this. A link to its documentation can be found here: https://wiki.ros.org/usb_cam#Pixel_formats.2Fencodings_reference
 
-This package can be installed in the terminal by using the following commands:
+This package can be installed in the terminal by using the following command:
 
 ```bash
 sudo apt-get install ros-<your-ros-distro>-usb-cam
