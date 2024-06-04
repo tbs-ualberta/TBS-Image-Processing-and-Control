@@ -31,7 +31,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rospy
 from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
-from img_processor.msg import MaskArray, MaskData
+from img_processor.msg import MaskArray
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 import os
@@ -98,7 +98,7 @@ class ImageProcessor:
         self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
         self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', MsgImg)
 
-        # Synchronize the topics
+        # Synchronize rgb and depth topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
         self.ts.registerCallback(self.callback)
 
@@ -135,7 +135,7 @@ class ImageProcessor:
                 masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
 
                 # Initialize target values
-                target = Point(-1,-1,-1)
+                target_pos = Point(-1,-1,-1)
 
                 # Convert masks to numpy arrays
                 masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
@@ -150,13 +150,13 @@ class ImageProcessor:
                                                 self.depth_dist_coeffs, self.extrinsic_matrix) for x, y in centroids_as_pixels]
 
                 # Find target
-                target = find_target(TARGET, centroids_as_pixels, phrases, depth_vals)
+                target_pos = find_target(TARGET, centroids_as_pixels, phrases, depth_vals)
 
                 # Convert to correct message type for publishing
                 mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, self.rgb_image)
                 
                 # Publish target values
-                self.target_pub.publish(target)
+                self.target_pub.publish(target_pos)
 
                 # Publish mask data
                 self.mask_pub.publish(mask_array)
