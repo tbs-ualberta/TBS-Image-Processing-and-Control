@@ -10,6 +10,8 @@ import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32
+from sensor_msgs.msg import Image as MsgImg
+import message_filters
 
 # -------------------------------------------- User defined constants ------------------------------------------------
 
@@ -29,19 +31,6 @@ ASSESSMENT_INTERVAL = 1.0 / ASSESSMENT_RATE # in seconds
 # --------------------------------------------------------------------------------------------------------------------
 
 # Function to calculate angle between three points
-def calculate_angle(a, b, c):
-    a = np.array(a)  # First point
-    b = np.array(b)  # Second point (vertex)
-    c = np.array(c)  # Third point
-
-    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-    angle = np.abs(radians * 180.0 / np.pi)
-
-    if angle > 180.0:
-        angle = 360 - angle
-
-    return angle
-
 def calculate_angle_3d(a, b, c):       
 
     v1 = np.array([ a[0] - b[0], a[1] - b[1], a[2] - b[2] ])
@@ -56,6 +45,7 @@ def calculate_angle_3d(a, b, c):
     angle_rad = np.arccos(res)
 
     return math.degrees(angle_rad)
+
 class PoseAssess:
     def __init__(self):
         self.bridge = CvBridge()
@@ -70,11 +60,17 @@ class PoseAssess:
         # Initialize MediaPipe drawing
         self.mp_drawing = mp.solutions.drawing_utils
 
-        # Initialize USB frame
-        self.usb_frame = None
+        # Initialize images
+        self.rgb_image = None
+        self.depth_image = None
 
-        # Subscriber to update usb image everytime one is received
-        self.usb_cam_sub = rospy.Subscriber('/usb_cam/image_raw', Image, self.callback)
+        # Define subscribers for depth and rgb topics
+        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
+        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', MsgImg)
+
+        # Synchronize the topics
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
+        self.ts.registerCallback(self.callback)
 
         # Timer to assess pose
         self.assess_timer = rospy.Timer(rospy.Duration(ASSESSMENT_INTERVAL), self.assess_pose)
@@ -85,14 +81,14 @@ class PoseAssess:
 
         rospy.loginfo("Pose Assessment Node Started")
 
-    def callback(self, usb_img_msg):
+    def callback(self, rgb_msg, depth_msg):
         try:
-            # Convert the usb rgb image to OpenCV format
-            self.usb_frame = self.bridge.imgmsg_to_cv2(usb_img_msg, desired_encoding="bgr8")
+            # Convert the rgb and depth images to OpenCV format
+            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
+            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
+
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert images: {e}")
-        except Exception as e:
-            rospy.logerr(f"Error in callback_no_mask: {e}")
 
     def assess_pose(self, event):
         if self.usb_frame is None:
@@ -100,7 +96,7 @@ class PoseAssess:
 
         # Assess pose
         # Convert the frame to RGB
-        image = cv2.cvtColor(self.usb_frame, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(self.rgb_image, cv2.COLOR_BGR2RGB)
 
         # Process the frame with MediaPipe Pose
         results = self.pose.process(image)

@@ -1,10 +1,10 @@
 <launch>
   <!-- Arguments to enable or disable nodes -->
   <arg name="run_img_display" default="true" />
-  <arg name="run_img_processor" default="true" />
+  <arg name="run_img_processor" default="false" />
   <arg name="run_img_save" default="false" />
-  <arg name="run_mask_display" default="true" />
-  <arg name="run_assess_pose" default="true" />
+  <arg name="run_mask_display" default="false" />
+  <arg name="run_assess_pose" default="false" />
 
   <!-- Always run Nodes-->
   <node name="kinect_pub_node" type="kinect_pub_node" pkg="kinect_pub" />

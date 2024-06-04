@@ -1,0 +1,12 @@
+# GetCameraInfo.srv
+
+# No request fields
+---
+float64 ir_fx
+float64 ir_fy
+float64 ir_cx
+float64 ir_cy
+float64 rgb_fx
+float64 rgb_fy
+float64 rgb_cx
+float64 rgb_cy

@@ -10,6 +10,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include "kinect_pub/GetCameraInfo.h"
 
 // ------------------------------- User defined constants -------------------------------
 
@@ -20,6 +21,22 @@ const int LOOP_RATE = 30; // in Hz
 const int TIMEOUT = 10; // in seconds
 
 // --------------------------------------------------------------------------------------
+
+libfreenect2::Freenect2Device::IrCameraParams irParams;
+libfreenect2::Freenect2Device::ColorCameraParams rgbParams;
+
+bool getCameraInfo(kinect_pub::GetCameraInfo::Request &req,
+                   kinect_pub::GetCameraInfo::Response &res) {
+    res.ir_fx = irParams.fx;
+    res.ir_fy = irParams.fy;
+    res.ir_cx = irParams.cx;
+    res.ir_cy = irParams.cy;
+    res.rgb_fx = rgbParams.fx;
+    res.rgb_fy = rgbParams.fy;
+    res.rgb_cx = rgbParams.cx;
+    res.rgb_cy = rgbParams.cy;
+    return true;
+}
 
 int main(int argc, char **argv)
 {
@@ -37,9 +54,14 @@ int main(int argc, char **argv)
 
     // Initialize Kinect
     libfreenect2::Freenect2 freenect2;
-    libfreenect2::Freenect2Device *dev = 0;
+    libfreenect2::Freenect2Device *dev = nullptr;
 
     dev = freenect2.openDefaultDevice();
+
+    if (freenect2.enumerateDevices() == 0) {
+        ROS_ERROR("No device connected!");
+        return -1;
+    }
 
     if (dev == nullptr) {
         ROS_ERROR("Failed to open Kinect device!");
@@ -63,8 +85,16 @@ int main(int argc, char **argv)
     ROS_INFO(srl_msg.c_str());
     ROS_INFO(frmwr_msg.c_str());
 
+    // Get calibration data
+    irParams = dev->getIrCameraParams();
+    rgbParams = dev->getColorCameraParams();
+
+    // Initialize service to send camera intrinsics
+    ros::ServiceServer service = nh.advertiseService("kinect2/get_camera_info", getCameraInfo);
+    ROS_INFO("Ready to provide camera info.");
+
     // For registration; this only initializes the registration object, and does not do any processing
-    libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
+    libfreenect2::Registration* registration = new libfreenect2::Registration(irParams, rgbParams);
     libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
     libfreenect2::Frame bigdepth(1920, 1080 + 2, 4);
     int colour_depth_ind [512 * 424];

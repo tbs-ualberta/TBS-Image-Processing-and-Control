@@ -16,6 +16,9 @@ TARGET = "person" # must be contained in the prompt
 # included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
 PROCESSING_RATE = 2 # in Hz
 
+# Distortion Coefficients
+depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
+
 # --------------------------------------------------------------------------------------------------------------------
 
 # -------------------------------------------- Calculated constants --------------------------------------------------
@@ -26,7 +29,6 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 # --------------------------------------------------------------------------------------------------------------------
 
 import rospy
-from std_msgs.msg import Int16, Float32
 from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
 from img_processor.msg import MaskArray, MaskData
@@ -40,15 +42,16 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from process_helper import ProcessingResults
-from process_helper import map_rgb_to_depth
+from process_helper import map_rgb_to_depth, calculate_centroids, find_target, convert_to_MaskArray
 import warnings
 from transformers import logging
+from kinect_pub.srv import GetCameraInfo
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 logging.set_verbosity_error()
+
 class ImageProcessor:
     def __init__(self):
         self.bridge = CvBridge()
@@ -57,13 +60,39 @@ class ImageProcessor:
         rospy.init_node('image_processor', anonymous=True)
         rospy.on_shutdown(self.cleanup)
 
+        # Get camera instrinsic data from service
+        get_camera_info = rospy.ServiceProxy('/kinect2/get_camera_info', GetCameraInfo)
+        camera_info = get_camera_info()
+
+        # Initialize intrinsic matrices
+        self.rgb_intrinsics = np.zeros((3,3))
+        self.depth_intrinsics = np.zeros((3,3))
+        self.depth_dist_coeffs = np.zeros(5)
+        self.extrinsic_matrix = np.zeros((3,3))
+        
+        if camera_info:
+            # Construct the intrinsic matrices
+            self.rgb_intrinsics = np.array([[camera_info.rgb_fx, 0, camera_info.rgb_cx],
+                                    [0, camera_info.rgb_fy, camera_info.rgb_cy],
+                                    [0, 0, 1]])
+            
+            self.depth_intrinsics = np.array([[camera_info.ir_fx, 0, camera_info.ir_cx],
+                                        [0, camera_info.ir_fy, camera_info.ir_cy],
+                                        [0, 0, 1]])
+            self.depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
+
+            # Construct extrinsic matrix
+            R = np.eye(3)  # Rotation matrix (3x3)
+            T = np.array([0, 0, 0])  # Translation vector (3x1)
+            self.extrinsic_matrix = np.eye(4)
+            self.extrinsic_matrix[:3, :3] = R
+            self.extrinsic_matrix[:3, 3] = T
+
         # Define publisher for mask data
         self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
 
-        # Publish position data to ROS topics for use with control algorithm
-        self.target_pub_x = rospy.Publisher("process/target/x", Int16, queue_size=10) # in px
-        self.target_pub_y = rospy.Publisher("process/target/y", Int16, queue_size=10) # in px
-        self.target_pub_depth = rospy.Publisher("process/target/depth", Float32, queue_size=10) # in mm
+        # Define publisher for target position data
+        self.target_pub = rospy.Publisher("process/target", Point, queue_size=10) # in px
 
         # Define subscribers for depth and rgb topics
         self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
@@ -85,15 +114,6 @@ class ImageProcessor:
         
         rospy.loginfo("Image Processor Node Started")
 
-    def callback(self, rgb_msg, depth_msg):
-        try:
-            # Convert the rgb and depth images to OpenCV format
-            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
-
-        except CvBridgeError as e:
-            rospy.logerr(f"Failed to convert images: {e}")
-
     def process_images(self, event):
         if self.rgb_image is not None and self.depth_image is not None:
             # rospy.loginfo("Processing images")
@@ -102,7 +122,7 @@ class ImageProcessor:
 
                 mask_array = MaskArray() # for publishing mask and centroid data
 
-                # convert image to PIL format and resize
+                # Convert image to PIL format and resize
                 image_pil = PilImg.fromarray(self.rgb_image)
                 w, h = image_pil.size
                 new_w, new_h = w // 1, h // 1
@@ -114,38 +134,44 @@ class ImageProcessor:
                 # Calculate masks and bounding boxes for images
                 masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
 
+                # Initialize target values
+                target = Point(-1,-1,-1)
+
+                # Convert masks to numpy arrays
+                masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
+                    
+                # Calculate the centroids of each mask
+                centroids_as_pixels = []
+                centroids_as_pixels = calculate_centroids(masks_np)
+
+                # Calculate corresponding depth values from RGB pixel coordinates
+                depth_vals = []
+                depth_vals = [map_rgb_to_depth(x, y, self.depth_image, self.rgb_intrinsics, self.depth_intrinsics, 
+                                                self.depth_dist_coeffs, self.extrinsic_matrix) for x, y in centroids_as_pixels]
+
+                # Find target
+                target = find_target(TARGET, centroids_as_pixels, phrases, depth_vals)
+
+                # Convert to correct message type for publishing
+                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, self.rgb_image)
+                
+                # Publish target values
+                self.target_pub.publish(target)
+
+                # Publish mask data
+                self.mask_pub.publish(mask_array)
+
                 # Clear the console for new output
                 os.system('clear')
-                rospy.logdebug(f"Inference time: {time.time() - time_start}")
 
+                # Print data to console
                 if len(masks) == 0:
                     # If no objects detected
                     rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
-
-                    # Add rgb image to array data
-                    mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
-
-                    # Publish centroid array
-                    self.mask_pub.publish(mask_array)
-
-                    # if object is not detected in frame, all values will be -1
-                    self.target_pub_x.publish(-1)
-                    self.target_pub_y.publish(-1)
-                    self.target_pub_depth.publish(-1)
+                    # if object is not detected in frame, all target values will be -1 (see above)
 
                 else:
                     # If at least one object detected
-
-                    # Create results object
-                    results = ProcessingResults(self.rgb_image, masks, boxes, phrases, logits)
-                    
-                    # Calculate the centroids of each map
-                    depth_vals = []
-                    centroids = results.find_object_centroids()
-                    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
-
-                    # Calculate corresponding depth values from RGB pixel coordinates
-                    depth_vals = [map_rgb_to_depth(x, y, self.depth_image) for x, y in centroids_as_pixels]
 
                     # Print calculated data to console
                     print("-------------------------------------------------------------------------------------------------")
@@ -154,45 +180,6 @@ class ImageProcessor:
                         rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
                         rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
-
-                    # Add mask data to array for publishing
-                    for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, results.masks_np):
-                        temp_mask = MaskData()
-                        temp_mask.phrase = phrase
-                        temp_mask.centroid = Point(centroid[0], centroid[1], depth_val) # the z part of the point is depth (in mm)
-                                                                                        # this should not be confused for a point in
-                                                                                        # 3d cartesian space, as x and y are in px
-                        temp_mask.logit = logit
-                        mask_image = (mask * 255).astype(np.uint8)
-                        temp_mask.mask = self.bridge.cv2_to_imgmsg(mask_image, encoding="mono8") 
-
-                        mask_array.mask_data.append(temp_mask)
-
-                    # Add rgb image to array data
-                    mask_array.rgb_img = self.bridge.cv2_to_imgmsg(self.rgb_image, encoding="bgr8")
-
-                    # Selects which object to target. This can be implemented in different ways,
-                    # but for now, it will just select the closest object.
-                    target_x = -1
-                    target_y = -1
-                    target_depth = -1
-                    min_depth = 100000
-                    
-                    # Find minimum depth of nearest target
-                    for temp_centroid, temp_phrase, temp_depth in zip(centroids_as_pixels, phrases, depth_vals):
-                        if TARGET in temp_phrase and temp_depth < min_depth:
-                            target_x = temp_centroid[0]
-                            target_y = temp_centroid[1]
-                            target_depth = temp_depth
-                            min_depth = temp_depth
-
-                    # Publish mask data
-                    self.mask_pub.publish(mask_array)
-                    
-                    # Publish target values
-                    self.target_pub_x.publish(target_x)
-                    self.target_pub_y.publish(target_y)
-                    self.target_pub_depth.publish(target_depth)
 
                 rospy.loginfo(f"Total processing time: {time.time() - time_start}")
                 print("-------------------------------------------------------------------------------------------------")
@@ -205,6 +192,15 @@ class ImageProcessor:
             # Reset images after processing
             self.rgb_image = None
             self.depth_image = None
+
+    def callback(self, rgb_msg, depth_msg):
+        try:
+            # Convert the rgb and depth images to OpenCV format
+            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
+            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
+
+        except CvBridgeError as e:
+            rospy.logerr(f"Failed to convert images: {e}")
 
     def cleanup(self):
         rospy.loginfo("Shutting down Image Processor Node")
