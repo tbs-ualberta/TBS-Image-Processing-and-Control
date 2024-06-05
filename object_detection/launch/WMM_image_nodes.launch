@@ -1,14 +1,21 @@
 <launch>
   <!-- Arguments to enable or disable nodes -->
   <arg name="run_img_display" default="true" />
-  <arg name="run_img_processor" default="false" />
+  <arg name="run_img_processor" default="true" />
   <arg name="run_img_save" default="false" />
-  <arg name="run_mask_display" default="false" />
-  <arg name="run_assess_pose" default="false" />
+  <arg name="run_mask_display" default="true" />
+  <arg name="run_assess_pose" default="true" />
 
   <!-- Always run Nodes-->
   <node name="kinect_pub_node" type="kinect_pub_node" pkg="kinect_pub" />
-  <node name="usb_cam" type="usb_cam_node" pkg="usb_cam" output="screen">
+
+  <!-- Node definitions with conditionals -->
+  <node if="$(arg run_img_display)" name="img_display_node" pkg="object_detection" type="img_display_node.py" output="screen" />
+  <node if="$(arg run_img_processor)" name="img_processor_node" pkg="object_detection" type="img_processor_node.py" output="screen" />
+  <node if="$(arg run_img_save)" name="img_save_node" pkg="object_detection" type="img_save_node.py" output="screen" />
+  <node if="$(arg run_mask_display)" name="mask_display_node" pkg="object_detection" type="mask_display_node.py" output="screen" />
+  
+  <node if="$(arg run_assess_pose)" name="usb_cam" type="usb_cam_node" pkg="usb_cam" output="screen">
     <param name="video_device" value="/dev/video0" />
     <param name="image_width" value="640" />
     <param name="image_height" value="480" />
@@ -20,12 +27,6 @@
     <param name="framerate" value="30" />
     <param name="image_format" value="bgr8" />
   </node>
-
-  <!-- Node definitions with conditionals -->
-  <node if="$(arg run_img_display)" name="img_display_node" pkg="object_detection" type="img_display_node.py" output="screen" />
-  <node if="$(arg run_img_processor)" name="img_processor_node" pkg="object_detection" type="img_processor_node.py" output="screen" />
-  <node if="$(arg run_img_save)" name="img_save_node" pkg="object_detection" type="img_save_node.py" output="screen" />
-  <node if="$(arg run_mask_display)" name="mask_display_node" pkg="object_detection" type="mask_display_node.py" output="screen" />
   <node if="$(arg run_assess_pose)" name="assess_pose_node" type="assess_pose_node.py" pkg="pose_assessment" output="screen"/>
 
 </launch>

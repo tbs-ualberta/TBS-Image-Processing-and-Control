@@ -3,17 +3,18 @@
 # using transformers-4.27.4 and huggingface-hub-0.16.4
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues when tested
 
+import numpy as np
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # This specifies the prompt which the model masks
-PROMPT = "person" # multiple objects can be detected using a '.' as a separator
+PROMPT = "person.phone.chair" # multiple objects can be detected using a '.' as a separator
 # PROMPT = "cat"
 
 # Specifies target. This allows for detection of multiple objects but only targetting of one
-TARGET = "person" # must be contained in the prompt
+TARGET = "phone" # must be contained in the prompt
 
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
-# included in this time, so it will add around 0.5s minimum to each cycle, regardless of the set rate
+# included in this time, so each cycle will be around 0.5s minimum, regardless of the set rate
 PROCESSING_RATE = 2 # in Hz
 
 # Distortion Coefficients
@@ -37,7 +38,6 @@ from cv_bridge import CvBridge, CvBridgeError
 import os
 import sys
 import time
-import numpy as np
 import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
@@ -122,8 +122,11 @@ class ImageProcessor:
 
                 mask_array = MaskArray() # for publishing mask and centroid data
 
-                # Convert image to PIL format and resize
+                # Convert image to PIL format
                 image_pil = PilImg.fromarray(self.rgb_image)
+                # Save image being processed to save alongside masks
+                prediction_image = self.rgb_image
+                # Resize PIL image
                 w, h = image_pil.size
                 new_w, new_h = w // 1, h // 1
                 image_pil = image_pil.resize((new_w, new_h), PilImg.ANTIALIAS)
@@ -153,7 +156,7 @@ class ImageProcessor:
                 target_pos = find_target(TARGET, centroids_as_pixels, phrases, depth_vals)
 
                 # Convert to correct message type for publishing
-                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, self.rgb_image)
+                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_image)
                 
                 # Publish target values
                 self.target_pub.publish(target_pos)
@@ -214,6 +217,3 @@ if __name__ == '__main__':
         image_processor.spin()
     except rospy.ROSInterruptException:
         pass
-
-# TODO sometimes centroid point does not have depth value.
-# Maybe add algorithm to find closest point with depth info and use that (if no depth at exact pixel)?

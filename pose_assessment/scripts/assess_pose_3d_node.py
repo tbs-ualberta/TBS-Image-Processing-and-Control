@@ -111,7 +111,6 @@ class PoseAssess:
 
             # TODO implement 3D angle detection
             # Get coordinates of shoulder, elbow, and wrist for left and right arms
-            print(landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value])
             left_shoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].z]
             left_elbow = [landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].z]
             left_wrist = [landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].z]
@@ -121,8 +120,8 @@ class PoseAssess:
             right_wrist = [landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].x, landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].y,landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST.value].z]
 
             # Calculate angles
-            left_angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
-            right_angle = calculate_angle(right_shoulder, right_elbow, right_wrist)
+            left_angle = calculate_angle_3d(left_shoulder, left_elbow, left_wrist)
+            right_angle = calculate_angle_3d(right_shoulder, right_elbow, right_wrist)
 
             # Publish angles (in degrees)
             self.left_arm_ang_pub.publish(left_angle)

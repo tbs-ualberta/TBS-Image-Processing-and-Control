@@ -115,7 +115,6 @@ class PoseAssess:
 
             # TODO implement 3D angle detection
             # Get coordinates of shoulder, elbow, and wrist for left and right arms
-            print(landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value])
             left_shoulder = [landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value].z]
             left_elbow = [landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW.value].z]
             left_wrist = [landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].y, landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST.value].z]
