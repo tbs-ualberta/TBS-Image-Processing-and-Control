@@ -1,0 +1,174 @@
+<robot name="WMM" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Mobile Base Link -->
+  <link name="mobile_base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.496 0.317 0.055"/>
+      </geometry>
+      <material>
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.496 0.317 0.055"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Wheel Back Left -->
+  <link name="wheel_back_left">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+      <material>
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Wheel Back Right -->
+  <link name="wheel_back_right">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+      <material>
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Wheel Front Left -->
+  <link name="wheel_front_left">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+      <material>
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Wheel Front Right -->
+  <link name="wheel_front_right">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+      <material>
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Joint Definitions -->
+  <joint name="joint_wheel_back_left" type="revolute">
+    <parent link="mobile_base_link"/>
+    <child link="wheel_back_left"/>
+    <origin xyz="-0.21 0.21 0.05" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="39" velocity="1.3963" lower="-1e+16" upper="1e+16"/>
+  </joint>
+
+  <joint name="joint_wheel_back_right" type="revolute">
+    <parent link="mobile_base_link"/>
+    <child link="wheel_back_right"/>
+    <origin xyz="-0.21 -0.21 0.05" rpy="-1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="39" velocity="1.3963" lower="-1e+16" upper="1e+16"/>
+  </joint>
+
+  <joint name="joint_wheel_front_left" type="revolute">
+    <parent link="mobile_base_link"/>
+    <child link="wheel_front_left"/>
+    <origin xyz="0.21 0.21 0.05" rpy="1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="39" velocity="1.3963" lower="-1e+16" upper="1e+16"/>
+  </joint>
+
+  <joint name="joint_wheel_front_right" type="revolute">
+    <parent link="mobile_base_link"/>
+    <child link="wheel_front_right"/>
+    <origin xyz="0.21 -0.21 0.05" rpy="-1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="39" velocity="1.3963" lower="-1e+16" upper="1e+16"/>
+  </joint>
+
+  <!-- Kinova Gen3 -->
+  <xacro:include filename="$(find ros_kortex)/kortex_description/arms/gen3/7dof/urdf/gen3_macro.xacro"/>
+  <xacro:macro name="Kinova_Gen3" params="">
+    <joint name="base_link_JOINT_2" type="fixed">
+      <parent link="mobile_base_link"/>
+      <child link="base_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Gazebo ROS Control Plugin -->
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/</robotNamespace>
+      <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+    </plugin>
+  </gazebo>
+
+</robot>

@@ -11,3 +11,5 @@ venv/
 
 # Ignore .vscode folder
 .vscode
+ros_kortex
+ros_gz

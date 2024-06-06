@@ -58,7 +58,7 @@ def map_rgb_to_depth(rgb_x, rgb_y, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS
 
 # --------------------------------------------- Conversion functions -------------------------------------------------
 def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, rgb_image):
-    bridge = CvBridge() # may not work
+    bridge = CvBridge()
     mask_array = MaskArray()
     for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, masks_np):
         temp_mask = MaskData()
