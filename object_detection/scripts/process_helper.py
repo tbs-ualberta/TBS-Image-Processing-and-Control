@@ -2,7 +2,7 @@
 
 import rospy
 from geometry_msgs.msg import Point
-from img_processor.msg import MaskArray, MaskData
+from object_detection.msg import MaskArray, MaskData
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from scipy.ndimage import measurements
