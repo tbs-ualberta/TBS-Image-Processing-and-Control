@@ -28,8 +28,8 @@ using namespace std;
 #define HOME_ACTION_IDENTIFIER 2
 #define pi 3.1416
 
-// global constant definitions
-// for mobile base wheels velocity calculation
+// Global constant definitions
+// For mobile base wheels velocity calculation
 const double r = constants::RADIUS; // Radius of the wheels
 const double W = constants::WIDTH; // Width of robot's wheelbase
 const double L = constants::LENGTH; // Length of robot's wheelbase
@@ -73,20 +73,12 @@ void example_send_joint_angles(ros::NodeHandle n, std::string robot_name, int de
     ros::ServiceClient service_client_play_joint_trajectory = n.serviceClient<kortex_driver::PlayJointTrajectory>("/" + robot_name + "/base/play_joint_trajectory");
     kortex_driver::PlayJointTrajectory service_play_joint_trajectory;
 
-    // std::vector<double> angles_to_send;
-    /*for (unsigned int i = 0; i < degrees_of_freedom-1; i++)
-    {
-      angles_to_send.push_back(0.0);
-    }
-    angles_to_send[6]=30;*/
-
     VectorXd angles_to_send(7, 1);
     for (unsigned int i = 0; i < degrees_of_freedom; i++)
     {
         angles_to_send[i] = position_gen3(i);
     }
-    // angles_to_send[6]=30;
-    // cout << position_gen3(1) << endl;
+
     for (int i = 0; i < degrees_of_freedom; i++)
     {
         kortex_driver::JointAngle temp_angle;
@@ -178,7 +170,7 @@ void get_arm_info(std::string* robot_name, int* degrees_of_freedom, bool* is_gri
     }
 }
 
-// These functions process incoming data from the subscribed topics
+// These functions update global variables with incoming data from the subscribed topics
 void posKF1_rec(const std_msgs::Float64 &posKF1_msg)
 {
     pos_base[0] = posKF1_msg.data;
@@ -200,7 +192,6 @@ void target_pos_rec(const geometry_msgs::Point &tar_pos_msg)
     target_pos = tar_pos_msg;
     update_target = true;
 }
-
 void ft_rec(const geometry_msgs::WrenchStamped &ft_msg)
 {
     end_f[0] = ft_msg.wrench.force.x;
@@ -244,16 +235,30 @@ void signalHandler(int signum)
     }
 }
 
-// calculates the corresponding velocities of each wheel to produce the given base velocity
+// Calculates the corresponding velocities of each wheel to produce the given base velocity
 VectorXd getWheelVelocities(double V_x, double V_y, double omega)
 {
     VectorXd wheelSpeeds(4, 1);
     wheelSpeeds << 0, 0, 0, 0; // Initialize with 4 zeros
-
     wheelSpeeds[0] = (1.0 / r) * (V_x - V_y - omega * lambda); // V_FL
     wheelSpeeds[1] = (1.0 / r) * (V_x + V_y + omega * lambda); // V_FR
     wheelSpeeds[2] = (1.0 / r) * (V_x + V_y - omega * lambda); // V_RL
     wheelSpeeds[3] = (1.0 / r) * (V_x - V_y + omega * lambda); // V_RR
 
     return wheelSpeeds;
+}
+
+// Calculates robot velocity from wheel speeds
+Vector3d getRobotVelocities(double V_FL, double V_FR, double V_RL, double V_RR)
+{
+    Vector3d robotVelocities;
+    double V_x, V_y, omega;
+
+    // Calculate the velocities
+    V_x = (r / 4) * (V_FL + V_FR + V_RL + V_RR);
+    V_y = (r / 4) * (-V_FL + V_FR + V_RL - V_RR);
+    omega = (r / (4 * lambda)) * (-V_FL + V_FR - V_RL + V_RR);
+
+    robotVelocities << V_x, V_y, omega;
+    return robotVelocities;
 }

@@ -7,15 +7,18 @@ import numpy as np
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # This specifies the prompt which the model masks
-PROMPT = "person.phone.chair" # multiple objects can be detected using a '.' as a separator
+PROMPT = "person" # multiple objects can be detected using a '.' as a separator
 # PROMPT = "cat"
 
 # Specifies target. This allows for detection of multiple objects but only targetting of one
-TARGET = "phone" # must be contained in the prompt
+TARGET = "person" # must be contained in the prompt
 
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
 # included in this time, so each cycle will be around 0.5s minimum, regardless of the set rate
-PROCESSING_RATE = 2 # in Hz
+PROCESSING_RATE = 1 # in Hz
+
+# Select whether the output should be printed to the terminal or not
+PRINT_OUTPUT = False
 
 # Distortion Coefficients
 depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
@@ -164,28 +167,29 @@ class ImageProcessor:
                 # Publish mask data
                 self.mask_pub.publish(mask_array)
 
-                # Clear the console for new output
-                os.system('clear')
+                if PRINT_OUTPUT:
+                    # Clear the console for new output
+                    os.system('clear')
 
-                # Print data to console
-                if len(masks) == 0:
-                    # If no objects detected
-                    rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
-                    # if object is not detected in frame, all target values will be -1 (see above)
+                    # Print data to console
+                    if len(masks) == 0:
+                        # If no objects detected
+                        rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
+                        # if object is not detected in frame, all target values will be -1 (see above)
 
-                else:
-                    # If at least one object detected
+                    else:
+                        # If at least one object detected
 
-                    # Print calculated data to console
-                    print("-------------------------------------------------------------------------------------------------")
-                    for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
-                        # Print info
-                        rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
-                        rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
+                        # Print calculated data to console
                         print("-------------------------------------------------------------------------------------------------")
+                        for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
+                            # Print info
+                            rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
+                            rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
+                            print("-------------------------------------------------------------------------------------------------")
 
-                rospy.loginfo(f"Total processing time: {time.time() - time_start}")
-                print("-------------------------------------------------------------------------------------------------")
+                    rospy.loginfo(f"Total processing time: {time.time() - time_start}")
+                    print("-------------------------------------------------------------------------------------------------")
 
             except (requests.exceptions.RequestException, IOError) as e:
                 rospy.logerr(f"Error: {e}")
