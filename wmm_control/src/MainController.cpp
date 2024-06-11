@@ -29,47 +29,45 @@ using namespace std;
 // global constant definitions
 // for PID controllers
 // Angular control
-const double Kp_angular = 0.1;
-const double Ki_angular = 0.01;
-const double Kd_angular = 0.05;
+const double KP_ANGULAR = 0.1;
+const double KI_ANGULAR = 0.01;
+const double KD_ANGULAR = 0.05;
 // Motor limits for angular velocity
-const double max_angular_velocity = 1.0;  // rad/s
-const double min_angular_velocity = -1.0; // rad/s
+const double MAX_ANG_VEL = 0.5;  // rad/s
+const double MIN_ANG_VEL = -0.5; // rad/s
 // Distance control
-const double Kp_distance = 0.1;
-const double Ki_distance = 0.01;
-const double Kd_distance = 0.05;
+const double KP_DISTANCE = 0.1;
+const double KI_DISTANCE = 0.01;
+const double KD_DISTANCE = 0.05;
 // Motor limits for linear velocity
-const double max_linear_velocity = 0.5;  // m/s
-const double min_linear_velocity = -0.5; // m/s
+const double MAX_LIN_VEL = 0.3;  // m/s
+const double MIN_LIN_VEL = -0.3; // m/s
 
-// Camera parameters
-const int frame_width = 640;
-const double horizontal_fov_degrees = 90.0;
-const double horizontal_fov_radians = horizontal_fov_degrees * M_PI / 180.0;
+// Camera parameters - from: https://www.researchgate.net/publication/283482095_Calibration_of_Kinect_for_Xbox_One_and_Comparison_between_the_Two_Generations_of_Microsoft_Sensors
+const int FRAME_WITDH = 1920;
+const double HORIZONTAL_FOV_DEG = 70;
+const double HORIZONTAL_FOV_RAD = HORIZONTAL_FOV_DEG * M_PI / 180.0;
 
 // Target parameters
-const int desired_x = frame_width / 2;                          // Target is the center of the frame
-const int accepted_error_range_pixels = frame_width * 0.10 / 2; // 10% of the frame width
+const int DESIRED_X = FRAME_WITDH / 2;                          // Target is the center of the frame
+const int ACCEPTED_ERROR_RANGE_PX = FRAME_WITDH * 0.10 / 2; // 10% of the frame width
 
 // Desired distance and error threshold
-const double desired_distance = 3.0;         // meters
-const double accepted_distance_error = 0.30; // meters
+const double DESIRED_DIST = 3.0;         // meters
+const double ACCEPTED_DIST_ERROR = 0.30; // meters
 
-// Robot parameters
-const double r = constants::RADIUS;      // Wheel radius in meters
-const double d = hypot(constants::WIDTH/2, constants::LENGTH/2); // Distance from wheel to center of the robot
+const double MAX_WHEEL_SPEED = 1.0; // Maximum wheel speed in rad/s
 
 // define thresholds for force and torque on end effector
-const double f_thresh = 5;
-const double t_thresh = 2.5;
+const double FORCE_TRESHOLD = 5;
+const double TORQUE_TRESHOLD = 2.5;
 
-const double max_wheel_speed = 1.0; // Maximum wheel speed in rad/s
 
 // global variable definitions
 double end_f[3], end_tq[3];
 double pos_base[4];
 geometry_msgs::Point target_pos; // Defines the position of the target in x(px), y(px), z(mm)
+bool update_target = false;
 
 int loop_count = 0;
 int main(int argc, char **argv)
@@ -82,6 +80,7 @@ int main(int argc, char **argv)
     int degrees_of_freedom = 7;
     bool is_gripper_present = false;
 
+    // get Kinova arm information and set to defaults
     get_arm_info(&robot_name, &degrees_of_freedom, &is_gripper_present);
 
     signal(SIGINT, signalHandler);
@@ -147,8 +146,8 @@ int main(int argc, char **argv)
     VectorXd row_means(6);
 
     // Define PID controllers for object tracking
-    PIDController pid_angular(Kp_angular, Ki_angular, Kd_angular, max_angular_velocity, min_angular_velocity);
-    PIDController pid_distance(Kp_distance, Ki_distance, Kd_distance, max_linear_velocity, min_linear_velocity);
+    PIDController pid_angular(KP_ANGULAR, KI_ANGULAR, KD_ANGULAR, MAX_ANG_VEL, MIN_ANG_VEL);
+    PIDController pid_distance(KP_DISTANCE, KI_DISTANCE, KD_DISTANCE, MAX_LIN_VEL, MIN_LIN_VEL);
     auto previous_time = std::chrono::high_resolution_clock::now();
 
     // main loop
@@ -157,11 +156,6 @@ int main(int argc, char **argv)
         // for keeping track of time (in seconds)
         double time_now = ros::Time::now().toSec();
         double time1 = time_now - time_start;
-
-        // Get the current time (for PID)
-        auto current_time = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = current_time - previous_time;
-        double dt = elapsed.count();
 
         // to remove offset from force sensor
         if (loop_count < 100)
@@ -240,40 +234,55 @@ int main(int argc, char **argv)
             //    NOTE: If the target object is ~500mm from the camera, the depth registers as 0.0
             //    NOTE: If the object depth cannot be found or calculated, it returns -1
 
-            // Calculate pixel error
-            double pixel_error = target_x - desired_x;
-
-            // Convert pixel error to angular error
-            double angular_error = (pixel_error / frame_width) * horizontal_fov_radians;
-
-            // Calculate distance error
-            double distance_error = target_depth - desired_distance;
-
-            // Calculate error range in radians
-            double accepted_error_range_radians = (accepted_error_range_pixels / frame_width) * horizontal_fov_radians;
-
-            // Check if angular error is within the accepted range
-            if (std::abs(angular_error) > accepted_error_range_radians)
+            // only calculate new values if a new target position is received
+            if(update_target)
             {
-                // Compute control output using PID controller for angular velocity
-                omega = pid_angular.compute(angular_error, dt);
-            }
-            else
-            {
-                std::string ros_msg = "Centroid within accepted range. No angular correction needed.";
-                ROS_INFO("%s", ros_msg.c_str());
-            }
+                // Get the current time (for PID)
+                auto current_time = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = current_time - previous_time;
+                double dt = elapsed.count();
 
-            // Check if distance error is within the accepted range
-            if (std::abs(distance_error) > accepted_distance_error)
-            {
-                // Compute control output using PID controller for linear velocity
-                Vx = pid_distance.compute(distance_error, dt);
-            }
-            else
-            {
-                std::string ros_msg = "Distance within accepted range. No distance correction needed.";
-                ROS_INFO("%s", ros_msg.c_str());
+                // Calculate pixel error
+                double pixel_error = target_x - DESIRED_X;
+
+                // Convert pixel error to angular error
+                double angular_error = (pixel_error / FRAME_WITDH) * HORIZONTAL_FOV_RAD;
+
+                // Calculate distance error
+                double distance_error = target_depth - DESIRED_DIST;
+
+                // Calculate error range in radians
+                double accepted_error_range_radians = (ACCEPTED_ERROR_RANGE_PX / FRAME_WITDH) * HORIZONTAL_FOV_RAD;
+
+                // Check if angular error is within the accepted range
+                if (std::abs(angular_error) > accepted_error_range_radians)
+                {
+                    // Compute control output using PID controller for angular velocity
+                    omega = pid_angular.compute(angular_error, dt);
+                }
+                else
+                {
+                    std::string ros_msg = "Centroid within accepted range. No angular correction needed.";
+                    ROS_INFO("%s", ros_msg.c_str());
+                }
+
+                // Check if distance error is within the accepted range
+                if (std::abs(distance_error) > ACCEPTED_DIST_ERROR)
+                {
+                    // Compute control output using PID controller for linear velocity
+                    Vx = pid_distance.compute(distance_error, dt);
+                }
+                else
+                {
+                    std::string ros_msg = "Distance within accepted range. No distance correction needed.";
+                    ROS_INFO("%s", ros_msg.c_str());
+                }
+
+                // Update the previous time
+                previous_time = current_time;
+
+                // Set update to false, so that the loop doesn't run again until the target position is updated
+                update_target = false;
             }
 
             // calculate individual wheel speeds
@@ -282,17 +291,17 @@ int main(int argc, char **argv)
             double max_speed = wheel_speeds.cwiseAbs().maxCoeff();
 
             // Scale wheel speeds if the maximum exceeds the allowed limit
-            if (max_speed > max_wheel_speed)
+            if (max_speed > MAX_WHEEL_SPEED)
             {
-                wheel_speeds = wheel_speeds * (max_wheel_speed / max_speed);
+                wheel_speeds = wheel_speeds * (MAX_WHEEL_SPEED / max_speed);
             }
-            // Update the previous time
-            previous_time = current_time;
-            
+
             // TODO make this function run independantly of the arm holding position and only when the speed is updated
 
+            // TODO update camera parameters using ROS service
+
             /*
-            if (fz < -f_thresh) // fz < -5
+            if (fz < -FORCE_TRESHOLD) // fz < -5
             {
                 // move forward
                 Vx = 0.30;
@@ -301,16 +310,16 @@ int main(int argc, char **argv)
 
                 // turn robot if torque is sufficient
                 // this will result in the robot driving through a curve, as the robot is also moving forward
-                if (tau_y > t_thresh) // tau_y > 2.5
+                if (tau_y > TORQUE_TRESHOLD) // tau_y > 2.5
                 {
                     omega = -0.3;
                 }
-                else if (tau_y < -t_thresh) // tau_y < -2.5
+                else if (tau_y < -TORQUE_TRESHOLD) // tau_y < -2.5
                 {
                     omega = 0.3;
                 }
             }
-            else if (fz > f_thresh) // fz > 5
+            else if (fz > FORCE_TRESHOLD) // fz > 5
             {
                 // move backwards
                 Vx = -0.30;
@@ -320,13 +329,13 @@ int main(int argc, char **argv)
             else
             {
                 // if force is below threshold, and torque is above threshold, turn robot in place
-                if (tau_y > t_thresh) // tau_y > 2.5
+                if (tau_y > TORQUE_TRESHOLD) // tau_y > 2.5
                 {
                     Vx = 0.0;
                     // Vy = 0.0;
                     omega = -0.5;
                 }
-                else if (tau_y < -t_thresh) // tau_y < -2.5
+                else if (tau_y < -TORQUE_TRESHOLD) // tau_y < -2.5
                 {
                     Vx = 0.0;
                     // Vy = 0.0;

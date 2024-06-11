@@ -198,6 +198,7 @@ void posKR2_rec(const std_msgs::Float64 &posKR2_msg)
 void target_pos_rec(const geometry_msgs::Point &tar_pos_msg)
 {
     target_pos = tar_pos_msg;
+    update_target = true;
 }
 
 void ft_rec(const geometry_msgs::WrenchStamped &ft_msg)

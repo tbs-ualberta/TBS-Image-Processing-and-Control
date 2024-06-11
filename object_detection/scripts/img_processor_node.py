@@ -32,7 +32,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rospy
 from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
-from img_processor.msg import MaskArray
+from object_detection.msg import MaskArray
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 import os

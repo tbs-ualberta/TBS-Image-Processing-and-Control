@@ -21,6 +21,7 @@ namespace constants
 extern double end_f[3], end_tq[3];
 extern double pos_base[4];
 extern geometry_msgs::Point target_pos; // Defines the position of the target in x(px), y(px), z(mm)
+extern bool update_target;
 
 class PIDController
 {
