@@ -78,16 +78,16 @@ def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks
 # --------------------------------------------- Conversion functions -------------------------------------------------
 
 # ------------------------------------------------ Target finding ----------------------------------------------------
-def find_target(target_phrase, centroids_as_pixels, phrases, depth_vals):
+def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, depth_vals, logits):
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
     # Find minimum depth of nearest target
     target_x = -1
     target_y = -1
-    target_depth = -1
+    target_depth = -1 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
     min_depth = 100000
-    for temp_centroid, temp_phrase, temp_depth in zip(centroids_as_pixels, phrases, depth_vals):
-        if target_phrase in temp_phrase and temp_depth < min_depth:
+    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, depth_vals, logits):
+        if target_phrase in temp_phrase and temp_depth < min_depth and temp_logit > target_confidence_threshold:
             target_x = temp_centroid[0]
             target_y = temp_centroid[1]
             target_depth = temp_depth

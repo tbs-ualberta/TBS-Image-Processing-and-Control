@@ -17,6 +17,9 @@ TARGET = "person" # must be contained in the prompt
 # included in this time, so each cycle will be around 0.5s minimum, regardless of the set rate
 PROCESSING_RATE = 1 # in Hz
 
+# The minimum confidence the model must have to use the object as a target
+TARGET_CONFIDENCE_THRESHOLD = 0.7
+
 # Select whether the output should be printed to the terminal or not
 PRINT_OUTPUT = False
 
@@ -156,7 +159,7 @@ class ImageProcessor:
                                                 self.depth_dist_coeffs, self.extrinsic_matrix) for x, y in centroids_as_pixels]
 
                 # Find target
-                target_pos = find_target(TARGET, centroids_as_pixels, phrases, depth_vals)
+                target_pos = find_target(TARGET, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
 
                 # Convert to correct message type for publishing
                 mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_image)
