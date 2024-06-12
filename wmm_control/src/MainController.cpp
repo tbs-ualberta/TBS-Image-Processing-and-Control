@@ -8,6 +8,7 @@
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Twist.h>
 #include <iostream>
 #include <thread>
 #include <Eigen/Dense>
@@ -86,8 +87,9 @@ int main(int argc, char **argv)
     // Set loop rate
     ros::Rate loop_rate(40);
 
-    // Setup variables for publishing wheel velocities
+    // Setup variables for publishing wheel and robot velocities
     std_msgs::Float64 velKF1, velKF2, velKR1, velKR2;
+    geometry_msgs::Twist robot_vel;
 
     // Define publishers
     ros::Publisher velocityKF1_pub = n.advertise<std_msgs::Float64>("/velocityKF1_send", 1000);
@@ -320,16 +322,17 @@ int main(int argc, char **argv)
 
                 // Scale wheel speeds if the maximum exceeds the allowed limit
                 if (max_speed > MAX_WHEEL_SPEED)
-                {
                     wheel_speeds = wheel_speeds * (MAX_WHEEL_SPEED / max_speed);
-                }
-
+                
                 std::cout << "Wheel speeds: " << wheel_speeds.transpose() << std::endl;
 
-                // TODO calculate real Vx, Vy, and omega from wheel speeds
-                
+                // calculate real Vx, Vy, and omega from wheel speeds (after scaling)
+                robot_vel = getRobotVelocities(wheel_speeds(0), wheel_speeds(1), wheel_speeds(2), wheel_speeds(3));
+
+                std::cout << "Robot velocity: " << robot_vel << std::endl;
+
                 // Assign messages for publishing
-                velKF1.data = -wheel_speeds(1);
+                velKF1.data = -wheel_speeds(1); // flip because of motor orientation
                 velKF2.data = -wheel_speeds(0);
                 velKR1.data = wheel_speeds(2);
                 velKR2.data = wheel_speeds(3);
@@ -339,6 +342,9 @@ int main(int argc, char **argv)
                 velocityKF2_pub.publish(velKF2);
                 velocityKR1_pub.publish(velKR1);
                 velocityKR2_pub.publish(velKR2);
+
+                // Publish robot velocities
+                base_velocity_pub.publish(robot_vel);
 
                 // Update previous time
                 previous_time = current_time;

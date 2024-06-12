@@ -17,6 +17,8 @@
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Twist.h>
+#include <Eigen/Dense>
 #include <csignal>
 #include <iostream>
 #include <thread>
@@ -30,10 +32,10 @@ using namespace std;
 
 // Global constant definitions
 // For mobile base wheels velocity calculation
-const double r = constants::RADIUS; // Radius of the wheels
+const double R = constants::RADIUS; // Radius of the wheels
 const double W = constants::WIDTH; // Width of robot's wheelbase
 const double L = constants::LENGTH; // Length of robot's wheelbase
-const double lambda = constants::LAMBDA;
+const double LAMBDA = constants::LAMBDA;
 
 double PIDController::compute(double error, double dt)
 {
@@ -236,29 +238,36 @@ void signalHandler(int signum)
 }
 
 // Calculates the corresponding velocities of each wheel to produce the given base velocity
-VectorXd getWheelVelocities(double V_x, double V_y, double omega)
+Eigen::VectorXd getWheelVelocities(double V_x, double V_y, double omega)
 {
-    VectorXd wheelSpeeds(4, 1);
-    wheelSpeeds << 0, 0, 0, 0; // Initialize with 4 zeros
-    wheelSpeeds[0] = (1.0 / r) * (V_x - V_y - omega * lambda); // V_FL
-    wheelSpeeds[1] = (1.0 / r) * (V_x + V_y + omega * lambda); // V_FR
-    wheelSpeeds[2] = (1.0 / r) * (V_x + V_y - omega * lambda); // V_RL
-    wheelSpeeds[3] = (1.0 / r) * (V_x - V_y + omega * lambda); // V_RR
+    VectorXd wheel_speeds(4, 1);
+    wheel_speeds << 0, 0, 0, 0; // Initialize with 4 zeros
+    wheel_speeds[0] = (1.0 / R) * (V_x - V_y - omega * LAMBDA); // V_fl
+    wheel_speeds[1] = (1.0 / R) * (V_x + V_y + omega * LAMBDA); // V_fr
+    wheel_speeds[2] = (1.0 / R) * (V_x + V_y - omega * LAMBDA); // V_rl
+    wheel_speeds[3] = (1.0 / R) * (V_x - V_y + omega * LAMBDA); // V_rr
 
-    return wheelSpeeds;
+    return wheel_speeds;
 }
 
 // Calculates robot velocity from wheel speeds
-Vector3d getRobotVelocities(double V_FL, double V_FR, double V_RL, double V_RR)
+geometry_msgs::Twist getRobotVelocities(double V_fl, double V_fr, double V_rl, double V_rr)
 {
-    Vector3d robotVelocities;
+    geometry_msgs::Twist twist;
     double V_x, V_y, omega;
 
     // Calculate the velocities
-    V_x = (r / 4) * (V_FL + V_FR + V_RL + V_RR);
-    V_y = (r / 4) * (-V_FL + V_FR + V_RL - V_RR);
-    omega = (r / (4 * lambda)) * (-V_FL + V_FR - V_RL + V_RR);
+    V_x = (R / 4) * (V_fl + V_fr + V_rl + V_rr);
+    V_y = (R / 4) * (-V_fl + V_fr + V_rl - V_rr);
+    omega = (R / (4 * LAMBDA)) * (-V_fl + V_fr - V_rl + V_rr);
 
-    robotVelocities << V_x, V_y, omega;
-    return robotVelocities;
+    // Set the calculated velocities to the twist message
+    twist.linear.x = V_x;
+    twist.linear.y = V_y;
+    twist.linear.z = 0.0;  // Assuming no movement in the z direction
+    twist.angular.x = 0.0; // Assuming no rotation around the x axis
+    twist.angular.y = 0.0; // Assuming no rotation around the y axis
+    twist.angular.z = omega;
+
+    return twist;
 }

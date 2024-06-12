@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <Eigen/Dense>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Twist.h>
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/WrenchStamped.h>
 
@@ -53,6 +54,6 @@ void target_pos_rec(const geometry_msgs::Point &tar_pos_msg);
 void ft_rec(const geometry_msgs::WrenchStamped &ft_msg);
 void signalHandler(int signum);
 Eigen::VectorXd getWheelVelocities(double V_x, double V_y, double omega);
-
+geometry_msgs::Twist getRobotVelocities(double V_fl, double V_fr, double V_rl, double V_rr);
 
 #endif // HELPER_FUNCTIONS_H
