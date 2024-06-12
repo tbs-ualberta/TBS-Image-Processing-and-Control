@@ -42,10 +42,6 @@ private:
     double integral;
 };
 
-void example_clear_faults(ros::NodeHandle n, std::string robot_name);
-void example_send_joint_angles(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, Eigen::VectorXd position_gen3);
-void example_send_joint_speeds(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, Eigen::VectorXd speed_gen3);
-void get_arm_info(std::string* robot_name, int* degrees_of_freedom, bool* is_gripper_present);
 void posKF1_rec(const std_msgs::Float64 &posKF1_msg);
 void posKF2_rec(const std_msgs::Float64 &posKF2_msg);
 void posKR1_rec(const std_msgs::Float64 &posKR1_msg);
