@@ -29,17 +29,24 @@ catkin_package(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-  src/MainController.cpp
   src/ControlHelper.cpp
 )
 
-## Add cmake target dependencies of the executable/library
+## Add cmake target dependencies of the library
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(wmm_control_node src/MainController.cpp src/ControlHelper.cpp)
+add_executable(wmm_control_node src/MainController.cpp)
 target_link_libraries(wmm_control_node
+  ${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${EIGEN3_LIBRARIES})
+
+add_executable(test_base_node src/Test_base.cpp)
+add_dependencies(test_base_node ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_base_node 
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+)
 
 install(TARGETS wmm_control_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

@@ -1,3 +1,4 @@
+// Andor Siegers and Mahdi Chalaki - based off an example provided by Kinova for their gen3 arm
 #include "wmm_control/HelperFunctions.h"
 #include "ros/ros.h"
 #include <kortex_driver/Base_ClearFaults.h>
@@ -136,7 +137,7 @@ void get_arm_info(std::string* robot_name, int* degrees_of_freedom, bool* is_gri
 {
     // Ensure parameters are correct and print them to the info stream
     // Parameter robot_name
-    if (!ros::param::get("~robot_name", *robot_name))
+    if (!ros::param::get("/my_gen3/my_gen3_driver/robot_name", *robot_name))
     {
         std::string error_string = "Parameter robot_name was not specified, defaulting to " + *robot_name + " as namespace";
         ROS_WARN("%s", error_string.c_str());

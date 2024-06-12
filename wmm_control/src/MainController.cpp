@@ -1,4 +1,4 @@
-
+// Andor Siegers and Mahdi Chalaki - based off an example provided by Kinova for their gen3 arm
 #include "wmm_control/HelperFunctions.h"
 #include "ros/ros.h"
 #include "std_msgs/String.h"

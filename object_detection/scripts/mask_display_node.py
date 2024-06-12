@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Authored by: Andor Siegers
 
 import rospy
 from object_detection.msg import MaskArray, MaskData
