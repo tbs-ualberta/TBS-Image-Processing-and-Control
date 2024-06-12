@@ -7,7 +7,7 @@ import numpy as np
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # This specifies the prompt which the model masks
-PROMPT = "person" # multiple objects can be detected using a '.' as a separator
+PROMPT = "person.chair" # multiple objects can be detected using a '.' as a separator
 # PROMPT = "cat"
 
 # Specifies target. This allows for detection of multiple objects but only targetting of one

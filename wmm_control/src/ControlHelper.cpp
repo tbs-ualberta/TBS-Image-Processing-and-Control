@@ -51,9 +51,9 @@ double PIDController::compute(double error, double dt)
 
     previous_error = error;
     return output;
-}
+} // end compute
 
-void example_clear_faults(ros::NodeHandle n, std::string robot_name)
+void clear_faults(ros::NodeHandle n, std::string robot_name)
 {
     ros::ServiceClient service_client_clear_faults = n.serviceClient<kortex_driver::Base_ClearFaults>("/" + robot_name + "/base/clear_faults");
     kortex_driver::Base_ClearFaults service_clear_faults;
@@ -68,9 +68,9 @@ void example_clear_faults(ros::NodeHandle n, std::string robot_name)
 
     // Wait a bit
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-}
+} // end clear_faults
 
-void example_send_joint_angles(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, VectorXd position_gen3)
+void send_joint_angles(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, VectorXd position_gen3)
 {
     // Initialize the ServiceClient
     ros::ServiceClient service_client_play_joint_trajectory = n.serviceClient<kortex_driver::PlayJointTrajectory>("/" + robot_name + "/base/play_joint_trajectory");
@@ -100,9 +100,9 @@ void example_send_joint_angles(ros::NodeHandle n, std::string robot_name, int de
         ROS_ERROR("%s", error_string.c_str());
         throw new std::runtime_error(error_string);
     }
-}
+} // end send_joint_angles
 
-void example_send_joint_speeds(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, VectorXd speed_gen3)
+void send_joint_speeds(ros::NodeHandle n, std::string robot_name, int degrees_of_freedom, VectorXd speed_gen3)
 {
     // Initialize the ServiceClient
     ros::ServiceClient service_client_send_joint_speed = n.serviceClient<kortex_driver::SendJointSpeedsCommand>("/" + robot_name + "/base/send_joint_speeds_command");
@@ -131,7 +131,7 @@ void example_send_joint_speeds(ros::NodeHandle n, std::string robot_name, int de
         ROS_ERROR("%s", error_string.c_str());
         throw new std::runtime_error(error_string);
     }
-}
+} // end send_joint_speeds
 
 void get_arm_info(std::string* robot_name, int* degrees_of_freedom, bool* is_gripper_present)
 {
@@ -171,7 +171,7 @@ void get_arm_info(std::string* robot_name, int* degrees_of_freedom, bool* is_gri
         std::string error_string = "Using is_gripper_present " + std::to_string(*is_gripper_present);
         ROS_INFO("%s", error_string.c_str());
     }
-}
+} // end get_arm_info
 
 // These functions update global variables with incoming data from the subscribed topics
 void posKF1_rec(const std_msgs::Float64 &posKF1_msg)
@@ -231,12 +231,12 @@ void signalHandler(int signum)
 
         VectorXd start_position(7, 1);
         start_position << 0, 0, 0, 0, 0, 0, 90;
-        example_send_joint_angles(n, robot_name, 7, start_position);
+        send_joint_angles(n, robot_name, 7, start_position);
 
         // Terminate the program
         exit(signum);
     }
-}
+} // end signalHandler
 
 // Calculates the corresponding velocities of each wheel to produce the given base velocity
 Eigen::VectorXd getWheelVelocities(double V_x, double V_y, double omega)
@@ -249,7 +249,7 @@ Eigen::VectorXd getWheelVelocities(double V_x, double V_y, double omega)
     wheel_speeds[3] = (1.0 / R) * (V_x - V_y + omega * LAMBDA); // V_rr
 
     return wheel_speeds;
-}
+} // end getWheelVelocities
 
 // Calculates robot velocity from wheel speeds
 geometry_msgs::Twist getRobotVelocities(double V_fl, double V_fr, double V_rl, double V_rr)
@@ -271,4 +271,4 @@ geometry_msgs::Twist getRobotVelocities(double V_fl, double V_fr, double V_rl, d
     twist.angular.z = omega;
 
     return twist;
-}
+} // end getRobotVelocities

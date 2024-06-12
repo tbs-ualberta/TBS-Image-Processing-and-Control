@@ -29,19 +29,19 @@ using namespace std;
 // for PID controllers TODO adjust all these values
 // Angular control
 const double KP_ANGULAR = 0.1;
-const double KI_ANGULAR = 0.01;
+const double KI_ANGULAR = 0.00;
 const double KD_ANGULAR = 0.05;
 // Motor limits for angular velocity
-const double MAX_ANG_VEL = 0.5;  // rad/s
-const double MIN_ANG_VEL = -0.5; // rad/s
+const double MAX_ANG_VEL = 5.0;  // rad/s  // 0.5
+const double MIN_ANG_VEL = -5.0; // rad/s // -0.5
 
 // Distance control
 const double KP_DISTANCE = 0.1;
-const double KI_DISTANCE = 0.01;
+const double KI_DISTANCE = 0.00;
 const double KD_DISTANCE = 0.05;
 // Motor limits for linear velocity
-const double MAX_LIN_VEL = 0.3;  // m/s
-const double MIN_LIN_VEL = -0.3; // m/s
+const double MAX_LIN_VEL = 0.5; // m/s // should be 0.3
+const double MIN_LIN_VEL = 0.0; // m/s // Robot will not go backwards
 
 // Camera parameters - from: https://www.researchgate.net/publication/283482095_Calibration_of_Kinect_for_Xbox_One_and_Comparison_between_the_Two_Generations_of_Microsoft_Sensors
 const int FRAME_WITDH = 1920;
@@ -49,14 +49,14 @@ const double HORIZONTAL_FOV_DEG = 70;
 const double HORIZONTAL_FOV_RAD = HORIZONTAL_FOV_DEG * M_PI / 180.0;
 
 // Target parameters
-const int DESIRED_X = FRAME_WITDH / 2;                          // Target is the center of the frame
-const int ACCEPTED_ERROR_RANGE_PX = FRAME_WITDH * 0.10 / 2; // 10% of the frame width
+const int DESIRED_X = FRAME_WITDH / 2;                      // Target is the center of the frame
+const int ACCEPTED_ERROR_RANGE_PX = FRAME_WITDH * 0.30 / 2; // 30% of the frame width
 
 // Desired distance and error threshold
 const double DESIRED_DIST = 1.0;         // meters
-const double ACCEPTED_DIST_ERROR = 0.30; // meters
+const double ACCEPTED_DIST_ERROR = 0.50; // meters // TODO if approaching robot it shouldn't go backwards
 
-const double MAX_WHEEL_SPEED = 5; // Maximum wheel speed in rad/s // TODO adjust
+const double MAX_WHEEL_SPEED = 100; // 45 // Maximum wheel speed in rad/s // This may be unnecessary
 
 // Define thresholds for force and torque on end effector
 const double FORCE_TRESHOLD = 5;
@@ -106,24 +106,22 @@ int main(int argc, char **argv)
     ros::Subscriber sub5 = n.subscribe("/netft_data", 1000, &ft_rec);
     ros::Subscriber subTar = n.subscribe("/process/target", 1000, &target_pos_rec);
 
-    //*******************************************************************************
     // Make sure to clear the robot's faults else it won't move if it's already in fault
-    example_clear_faults(n, robot_name);
-    //*******************************************************************************
+    clear_faults(n, robot_name);
 
     // Move arm to start position
     VectorXd start_position(7, 1);
     start_position << 0, 0, 0, 0, 0, 0, 90; // arm straight upwards
-    example_send_joint_angles(n, robot_name, degrees_of_freedom, start_position);
+    send_joint_angles(n, robot_name, degrees_of_freedom, start_position);
     // std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // for testing
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000)); // for testing
 
     // Move arm to walker position
     VectorXd walker_position(7, 1);
     walker_position << 0, 25.3, 0, 278, 0, 328.56, 90; // Experimental values - Handles in good position
-    example_send_joint_angles(n, robot_name, degrees_of_freedom, walker_position);
+    send_joint_angles(n, robot_name, degrees_of_freedom, walker_position);
     // std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // for testing
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000)); // for testing
 
     // Define a vector for joint speeds
     VectorXd kortex_speed(7, 1);
@@ -142,7 +140,7 @@ int main(int argc, char **argv)
     float Vy_final = 0;
     float omega_final = 0;
 
-    // For removing offset
+    // // For removing offset
     // int window_size = 100;
     // MatrixXd biased_data_history(6, window_size);
     // VectorXd biased_data_points(6);
@@ -160,7 +158,7 @@ int main(int argc, char **argv)
         double time_now = ros::Time::now().toSec();
         double time1 = time_now - time_start;
 
-        // To remove offset from force sensor
+        // // To remove offset from force sensor
         // if (loop_count < 100)
         // {
         //     // adds force data to matrix to be used in calibration
@@ -171,7 +169,7 @@ int main(int argc, char **argv)
         // Calculate mean of each row
         // row_means = biased_data_history.rowwise().mean();
 
-        if (time1 > 4.0 && time1 < 6.0)
+        if ((time1 > 4.0 && time1 < 6.0))
         {
             // Set arm to static position
             kortex_speed[0] = 0 / 10.0; // TODO why divide by 10.0?
@@ -181,8 +179,7 @@ int main(int argc, char **argv)
             kortex_speed[4] = 0 / 10.0;
             kortex_speed[5] = 0 / 10.0;
             kortex_speed[6] = 0 / 10.0;
-
-            example_send_joint_speeds(n, robot_name, degrees_of_freedom, kortex_speed);
+            send_joint_speeds(n, robot_name, degrees_of_freedom, kortex_speed);
 
             // Move forward slightly, indicating robot is ready
             double Vx = 0.01;   // forward speed
@@ -203,7 +200,7 @@ int main(int argc, char **argv)
             velocityKR1_pub.publish(velKR1);
             velocityKR2_pub.publish(velKR2);
         }
-        else if (time1 > 6.0)
+        else if (time1 > 6.0 || true) // the true term in this if statement should be removed when force sensing needs to be added back in
         {
             // Regular operation begins
             
@@ -215,7 +212,7 @@ int main(int argc, char **argv)
             kortex_speed[4] = 0 / 10.0;
             kortex_speed[5] = 0 / 10.0;
             kortex_speed[6] = 0 / 10.0;
-            example_send_joint_speeds(n, robot_name, degrees_of_freedom, kortex_speed);
+            send_joint_speeds(n, robot_name, degrees_of_freedom, kortex_speed);
 
             // ------------------------------------------------------- Robot Control Loop ----------------------------------------------------------------
             /*
@@ -236,6 +233,7 @@ int main(int argc, char **argv)
             If no target object is detected, it will not move.
             If a target object is detected by the image recognition, but its centroid is not in the detection
             range of the depth camera, the robot will track the object by turning in place (no linear movement).
+            If the target object comes closer to the robot, the robot will hold it's position (will not backup).
             */
 
             // Only calculate new speed values when a new target position is received
@@ -255,6 +253,8 @@ int main(int argc, char **argv)
                 float target_x = target_pos.x;     // in px
                 float target_y = target_pos.y;     // in px
                 float target_depth = target_pos.z; // in mm
+                target_depth = target_depth / 1000;// convert to meters
+
                 std::cout << "Target position: (" << target_x << ", " << target_y << ", " << target_depth << ")" << std::endl;
 
                 // Check if valid target
@@ -266,7 +266,7 @@ int main(int argc, char **argv)
                 else
                 {
                     // Target in frame
-                    if (target_depth != 0 && target_depth != -1)
+                    if (target_depth > 0.0)
                     {
                         // Target in detectable range
                         
@@ -288,7 +288,8 @@ int main(int argc, char **argv)
                     else
                     {
                         // Target in frame but >4.5m or <0.5m away
-                        std::cout << "Target outside of detectable range." << std::endl;
+                        std::string ros_msg = "Target outside of detectable range.";
+                        ROS_INFO("%s", ros_msg.c_str());
                     }
 
                     // Turn towards target
@@ -315,7 +316,7 @@ int main(int argc, char **argv)
                 }
 
                 // Calculate individual wheel speeds from intended base speed
-                VectorXd velocities = getWheelVelocities(Vx, Vy, omega); // calculate individual wheel velocities
+                VectorXd velocities = getWheelVelocities(Vx, Vy, omega); // Calculate individual wheel velocities
 
                 VectorXd wheel_speeds = velocities * 109 / pi;
                 double max_speed = wheel_speeds.cwiseAbs().maxCoeff();
@@ -326,10 +327,10 @@ int main(int argc, char **argv)
                 
                 std::cout << "Wheel speeds: " << wheel_speeds.transpose() << std::endl;
 
-                // calculate real Vx, Vy, and omega from wheel speeds (after scaling)
+                // Calculate real Vx, Vy, and omega from wheel speeds (after scaling)
                 robot_vel = getRobotVelocities(wheel_speeds(0), wheel_speeds(1), wheel_speeds(2), wheel_speeds(3));
 
-                std::cout << "Robot velocity: " << robot_vel << std::endl;
+                std::cout << "Robot velocity: " << std::endl << robot_vel << std::endl;
 
                 // Assign messages for publishing
                 velKF1.data = -wheel_speeds(1); // flip because of motor orientation
@@ -452,4 +453,7 @@ int main(int argc, char **argv)
         loop_rate.sleep();
     }
     return 0;
-}
+} // end main
+
+// TODO write launch file to launch WMM
+// Write documentation that explains launch file
