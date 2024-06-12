@@ -1,4 +1,3 @@
-
 #include "wmm_control/HelperFunctions.h"
 #include "ros/ros.h"
 #include "std_msgs/String.h"
