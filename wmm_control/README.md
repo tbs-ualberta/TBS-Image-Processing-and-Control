@@ -20,19 +20,24 @@ There are 5 separate components on the robot that need to be physically turned o
 ## Robot Driver Setup
 #TODO write the ethernet configurations required by the controlling system.
 Once the hardware is turned on, the supporting programs can be started. This is done by running the "robot_startup.launch" file on the computer connected directly to the WMM using the following command:
+
     ```bashrc
     roslaunch wmm_control robot_startup.launch
     ```
+
 This file launches the Kinova arm driver, the Arduino board controller, and the force sensor driver by default. If for any reason one (or more) of these nodes should not be launched, the "run_arm_driver", "run_ati_sensor", and "run_robot_base" can be set in the file itself, or when launching. For example:    
+
     ```bashrc
     roslaunch wmm_control robot_startup.launch run_arm_driver:=true run_ati_sensor:=false run_wheeled_robot:=true
     ```
 
 ## Running the Control Program
 Once the support programs are running, the control program, along with the object recognition and it's supporting programs can be run. This can be done using the "test_control.launch" launch file. This is separated from the first launch file so that it can be run on a different machine, as it requires a powerful GPU that the computer driving the robot may not have. It can be run using the following command:
+
     ```bashrc
     roslaunch wmm_control test_control.launch
     ```
+
 It also contains parameters to adjust which nodes launch. For more information about each node and the specific parameter names, see the launch file. The nodes launched are included in the kinect_pub and object_detection packages. See their README files for more information.
 
 # The Control Program
