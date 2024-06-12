@@ -1,0 +1,28 @@
+<!-- This file is meant to be run on the computer connected directly to the robot. -->
+<launch>
+  <!-- Parameters to choose which nodes to run -->
+  <arg name="run_arm_driver" default="true" />
+  <arg name="run_ati_sensor" default="true" />
+  <arg name="run_robot_base" default="true" />
+
+  <!-- Launch arm driver if enabled -->
+  <group ns="kortex_driver" if="$(arg run_arm_driver)">
+    <rosparam command="load" file="$(find kortex_driver)/config/kortex_driver_params.yaml" />
+    <node pkg="kortex_driver" type="kortex_driver_node" name="kortex_driver_node" output="screen">
+      <rosparam subst_value="true" param="robot_ip">192.168.1.21</rosparam>
+    </node>
+  </group>
+  
+  <!-- Launch ATI sensor if enabled -->
+  <group ns="netft_utils" if="$(arg run_ati_sensor)">
+    <node pkg="netft_utils" type="netft_node" name="netft_node" output="screen">
+      <param name="address" value="192.168.1.3" />
+    </node>
+  </group>
+  
+  <!-- Launch robot base (Arduino board) if enabled -->
+  <group ns="rosserial_server" if="$(arg run_robot_base)">
+    <env name="ROS_MASTER_URI" value="http://192.168.2.5:11311" />
+    <node pkg="rosserial_server" type="socket_node" name="rosserial_socket" output="screen" />
+  </group>
+</launch>
