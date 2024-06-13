@@ -17,6 +17,7 @@ There are 5 separate components on the robot that need to be physically turned o
 3. The Mobile Base - is powered on by simply plugging the grey cable into the power socket.
 4. The Force Sensor (optional) - is turned on by powering on the connected external power supply.
 5. The Xbox Kinect V2 Camera (optional) - is turned on by plugging the black barrel connector into the USB adapter.
+
 The Arduino and Kinova arm then need to be connected to the computer. In our lab, this is done by connecting ethernet1 to the Arduino, while ethernet2 is connected to the Kinova arm.
 The Xbox KinectV2 Camera is connected via USB directly to the computer running image processing, although due to the modular nature of ROS, it could be connected to the control computer (although the node would then have to be launched manually, or the launch files would need to be modified). For more information see the "kinect_pub" folder.
 
