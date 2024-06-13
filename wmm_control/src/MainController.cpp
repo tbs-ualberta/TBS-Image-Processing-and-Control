@@ -31,7 +31,7 @@ using namespace std;
 const double KP_ANGULAR = 0.1;
 const double KI_ANGULAR = 0.00;
 const double KD_ANGULAR = 0.05;
-// Motor limits for angular velocity
+// Limits for angular velocity
 const double MAX_ANG_VEL = 5.0;  // rad/s  // 0.5
 const double MIN_ANG_VEL = -5.0; // rad/s // -0.5
 
