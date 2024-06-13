@@ -7,18 +7,20 @@ This package contains the main control program for the Wheeled Mobile Manipulato
 
 # Setup
 To run this program, a few things must first be done. Launch files assist with this, but some manual setup is also required.
+Note: some of this is setup specific and may not be relevant to other setups. This document assumes that one computer is connected to the Kinova arm, Arduino, and force sensor, and runs their corresponding driver programs, while another computer on the same ROS network runs the processing and control programs, as a powerful GPU is required to run the object detection algorithm in near to real time. "roscore" is run on the first computer (connected directly to the robot). To setup a similar network, the instructions given [here](https://wiki.ros.org/ROS/Tutorials/MultipleMachines) are helpful.
 
 ## Turn on the Hardware
 There are 5 separate components on the robot that need to be physically turned on before proceeding:
-1. The Kinova Gen3 Arm - is turned on by holding down the button on the base of the arm for at least 2 seconds (until the light starts to blink)
-2. The Arduino - is turned on by plugging in the external 9v battery to the board
+1. The Kinova Gen3 Arm - is turned on by holding down the button on the base of the arm for at least 2 seconds (until the light starts to blink).
+2. The Arduino - is turned on by plugging in the external 9v battery to the board.
     - Note: after plugging in the battery, two green LEDs should light up on the Arduino. If these do not both light up, try changing the battery.
-3. The Mobile Base - is powered on by simply plugging the grey cable into the power socket
-4. The Force Sensor (optional) - is turned on by powering on the external power supply
+3. The Mobile Base - is powered on by simply plugging the grey cable into the power socket.
+4. The Force Sensor (optional) - is turned on by powering on the connected external power supply.
 5. The Xbox Kinect V2 Camera (optional) - is turned on by plugging the black barrel connector into the USB adapter.
+The Arduino and Kinova arm then need to be connected to the computer. In our lab, this is done by connecting ethernet1 to the Arduino, while ethernet2 is connected to the Kinova arm.
+The Xbox KinectV2 Camera is connected via USB directly to the computer running image processing, although due to the modular nature of ROS, it could be connected to the control computer (although the node would then have to be launched manually, or the launch files would need to be modified). For more information see the "kinect_pub" folder.
 
 ## Robot Driver Setup
-#TODO write the ethernet configurations required by the controlling system.
 Once the hardware is turned on, the supporting programs can be started. This is done by running the "robot_startup.launch" file on the computer connected directly to the WMM using the following command:
 
     roslaunch wmm_control robot_startup.launch
