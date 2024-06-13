@@ -1,7 +1,7 @@
 # Introduction
 This package contains the main control program for the Wheeled Mobile Manipulator (WMM). It contains the original control program (Test_base.cpp) as well as an updated program that supports the XBox Kinect integration. This allows the image processing to effect how the robot is controlled.
 
-# Assumptions
+## Assumptions
 - Operating system: Ubuntu 20.04.6 LTS
 - ROS version: Noetic
 
