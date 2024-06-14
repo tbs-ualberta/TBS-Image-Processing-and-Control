@@ -33,9 +33,9 @@ using namespace std;
 
 // Global constant definitions
 // For mobile base wheels velocity calculation
-const double R = constants::RADIUS; // Radius of the wheels
-const double W = constants::WIDTH; // Width of robot's wheelbase
-const double L = constants::LENGTH; // Length of robot's wheelbase
+const double R = constants::RADIUS;     // Radius of the wheels
+const double W = constants::WIDTH;      // Width of robot's wheelbase
+const double L = constants::LENGTH;     // Length of robot's wheelbase
 const double LAMBDA = constants::LAMBDA;
 
 double PIDController::compute(double error, double dt)

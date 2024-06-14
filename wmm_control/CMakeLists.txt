@@ -25,8 +25,6 @@ catkin_package(
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs sensor_msgs kortex_driver
 )
 
-
-
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   src/ControlHelper.cpp
@@ -39,7 +37,15 @@ add_executable(wmm_control_node src/MainController.cpp)
 target_link_libraries(wmm_control_node
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
-  ${EIGEN3_LIBRARIES})
+  ${EIGEN3_LIBRARIES}
+)
+
+add_executable(wave_arm_node src/WaveArm.cpp)
+target_link_libraries(wave_arm_node
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+)
 
 add_executable(test_base_node src/Test_base.cpp)
 add_dependencies(test_base_node ${catkin_EXPORTED_TARGETS})
