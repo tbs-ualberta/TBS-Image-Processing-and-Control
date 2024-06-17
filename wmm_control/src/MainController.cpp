@@ -28,7 +28,7 @@ using namespace std;
 
 // for PID controllers TODO adjust all these values
 // Angular control
-const double KP_ANGULAR = 0.1;
+const double KP_ANGULAR = 1.0;
 const double KI_ANGULAR = 0.00;
 const double KD_ANGULAR = 0.05;
 // Limits for angular velocity
@@ -50,13 +50,13 @@ const double HORIZONTAL_FOV_RAD = HORIZONTAL_FOV_DEG * M_PI / 180.0;
 
 // Target parameters
 const int DESIRED_X = FRAME_WITDH / 2;                      // Target is the center of the frame
-const int ACCEPTED_ERROR_RANGE_PX = FRAME_WITDH * 0.30 / 2; // 30% of the frame width
+const int ACCEPTED_ERROR_RANGE_PX = FRAME_WITDH * 0.50 / 2; // 30% of the frame width
 
 // Desired distance and error threshold
 const double DESIRED_DIST = 1.0;         // meters
 const double ACCEPTED_DIST_ERROR = 0.50; // meters // TODO if approaching robot it shouldn't go backwards
 
-const double MAX_WHEEL_SPEED = 100; // 45 // Maximum wheel speed in rad/s // This may be unnecessary
+const double MAX_WHEEL_SPEED = 20; // 45 // Maximum wheel speed in rad/s // This may be unnecessary
 
 // Define thresholds for force and torque on end effector
 const double FORCE_TRESHOLD = 5;
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
     // Setup variables for publishing wheel and robot velocities
     std_msgs::Float64 velKF1, velKF2, velKR1, velKR2;
-    geometry_msgs::Twist robot_vel;
+    geometry_msgs::Twist robot_vel, robot_vel_norm;
 
     // Define publishers
     ros::Publisher velocityKF1_pub = n.advertise<std_msgs::Float64>("/velocityKF1_send", 1000);
@@ -97,6 +97,7 @@ int main(int argc, char **argv)
     ros::Publisher velocityKR1_pub = n.advertise<std_msgs::Float64>("/velocityKR1_send", 1000);
     ros::Publisher velocityKR2_pub = n.advertise<std_msgs::Float64>("/velocityKR2_send", 1000);
     ros::Publisher base_velocity_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+    ros::Publisher base_normalized_velocity_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel_norm", 1000);
 
     // Define subscribers
     ros::Subscriber sub1 = n.subscribe("/positionKF1_receive", 1000, &posKF1_rec);
@@ -315,6 +316,11 @@ int main(int argc, char **argv)
                     }
                 }
 
+                // Assign desired velocities to variable for publishing (before normalization)
+                robot_vel.linear.x = Vx;
+                robot_vel.linear.y = Vy;
+                robot_vel.angular.z = omega;
+
                 // Calculate individual wheel speeds from intended base speed
                 VectorXd velocities = getWheelVelocities(Vx, Vy, omega); // Calculate individual wheel velocities
 
@@ -328,9 +334,10 @@ int main(int argc, char **argv)
                 std::cout << "Wheel speeds: " << wheel_speeds.transpose() << std::endl;
 
                 // Calculate real Vx, Vy, and omega from wheel speeds (after scaling)
-                robot_vel = getRobotVelocities(wheel_speeds(0), wheel_speeds(1), wheel_speeds(2), wheel_speeds(3));
+                robot_vel_norm = getRobotVelocities(wheel_speeds(0), wheel_speeds(1), wheel_speeds(2), wheel_speeds(3));
 
-                std::cout << "Robot velocity: " << std::endl << robot_vel << std::endl;
+                std::cout << "Vx: " << robot_vel.linear.x << std::endl
+                          << "Omega: " << robot_vel.angular.z << std::endl << std::endl;
 
                 // Assign messages for publishing
                 velKF1.data = -wheel_speeds(1); // flip because of motor orientation
@@ -346,6 +353,7 @@ int main(int argc, char **argv)
 
                 // Publish robot velocities
                 base_velocity_pub.publish(robot_vel);
+                base_normalized_velocity_pub.publish(robot_vel_norm);
 
                 // Update previous time
                 previous_time = current_time;
