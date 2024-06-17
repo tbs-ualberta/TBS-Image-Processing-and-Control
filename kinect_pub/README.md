@@ -30,4 +30,4 @@ The steps in this document were done with the following assumptions:
 ```
 
 # C++ Publisher Program
-The “kinect_publisher_node.cpp” file takes the output of the Xbox Kinect (accessed through libfreenect2), and publishes it to 4 separate ROS topics at a specified rate. These ROS topics correspond with the depth, RGB, IR, and combined depth and RGB (defined as reg) data being output by the Kinect.
+The “kinect_publisher_node.cpp” file takes the output of the Xbox Kinect (accessed through libfreenect2), and publishes it to 4 separate ROS topics at a specified rate. These ROS topics correspond with the depth, RGB, and IR data being output by the Kinect. The final ROS topic corresponds with a registered image, which is a combination of the depth and RGB data being output by the sensor.
