@@ -15,8 +15,6 @@ venv/
 # Ignore other repositories in this folder
 ros_kortex
 ros_gz
-ranger_ros
-ugv_sdk
 
 # CMakeLists
 /CMakeLists.txt

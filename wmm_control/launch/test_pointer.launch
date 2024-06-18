@@ -1,0 +1,19 @@
+<launch>
+  <!-- Arguments to enable or disable nodes -->
+  <arg name="run_img_display" default="false" />
+  <arg name="run_img_processor" default="true" />
+  <arg name="run_img_save" default="false" />
+  <arg name="run_mask_display" default="true" />
+  <arg name="run_pointer" default="true" />
+
+  <!-- Always run Nodes-->
+  <node name="kinect_pub_node" type="kinect_pub_node" pkg="kinect_pub" />
+
+  <!-- Node definitions with conditionals -->
+  <node if="$(arg run_img_display)" name="img_display_node" pkg="object_detection" type="img_display_node.py" output="screen" />
+  <node if="$(arg run_img_processor)" name="img_processor_node" pkg="object_detection" type="img_processor_node.py" output="screen" />
+  <node if="$(arg run_img_save)" name="img_save_node" pkg="object_detection" type="img_save_node.py" output="screen" />
+  <node if="$(arg run_mask_display)" name="mask_display_node" pkg="object_detection" type="mask_display_node.py" output="screen" />
+  <node if="$(arg run_pointer)" name="wmm_pointer_node" pkg="wmm_control" type="wmm_pointer_node" output="screen" />
+
+</launch>

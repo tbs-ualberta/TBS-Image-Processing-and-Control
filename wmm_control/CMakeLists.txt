@@ -47,6 +47,13 @@ target_link_libraries(wave_arm_node
   ${EIGEN3_LIBRARIES}
 )
 
+add_executable(wmm_pointer_node src/Pointer.cpp)
+target_link_libraries(wmm_pointer_node
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+)
+
 add_executable(test_base_node src/Test_base.cpp)
 add_dependencies(test_base_node ${catkin_EXPORTED_TARGETS})
 target_link_libraries(test_base_node 
