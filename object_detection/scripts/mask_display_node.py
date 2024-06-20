@@ -22,6 +22,7 @@ class ImageSaverProcessor:
         self.logits = []
         self.masks = [] # boolean array
         self.mask_image = None # RGB image accompanying mask data
+        self.depth_image = None # Depth image accompanying mask data
 
         # Define subscriber for masks
         self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.convert_mask_data)
@@ -42,6 +43,7 @@ class ImageSaverProcessor:
             self.logits = []
             self.masks = []  # boolean array
             self.mask_image = None  # RGB image accompanying mask data
+            self.depth_image = None # Depth image accompanying mask data
 
             # Convert data back to accessible data types
             for temp_mask in mask_data.mask_data:
@@ -61,6 +63,7 @@ class ImageSaverProcessor:
 
             # Convert rgb image to OpenCV format
             self.mask_image = self.bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
+            self.depth_image = self.bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
 
             self.display_masks()
 
@@ -105,6 +108,8 @@ class ImageSaverProcessor:
 
             # Display image in window
             cv2.imshow("Mask Overlay Image", overlay)
+            cv2.imshow("Depth Image", self.depth_image)
+
             cv2.waitKey(1)
 
         except Exception as e:

@@ -131,7 +131,9 @@ class ImageProcessor:
                 # Convert image to PIL format
                 image_pil = PilImg.fromarray(self.rgb_image)
                 # Save image being processed to save alongside masks
-                prediction_image = self.rgb_image
+                prediction_image_rgb = self.rgb_image
+                prediction_image_depth = self.depth_image
+
                 # Resize PIL image
                 w, h = image_pil.size
                 new_w, new_h = w // 1, h // 1
@@ -162,7 +164,8 @@ class ImageProcessor:
                 target_pos = find_target(TARGET, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
 
                 # Convert to correct message type for publishing
-                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_image)
+                mask_array = convert_to_MaskArray(
+                    centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_image_rgb, prediction_image_depth)
                 
                 # Publish target values
                 self.target_pub.publish(target_pos)
