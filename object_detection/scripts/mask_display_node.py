@@ -2,7 +2,7 @@
 # Authored by: Andor Siegers
 
 import rospy
-from object_detection.msg import MaskArray, MaskData
+from object_detection.msg import MaskArray
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -25,12 +25,21 @@ class ImageSaverProcessor:
         self.depth_image = None # Depth image accompanying mask data
 
         # Define subscriber for masks
-        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.convert_mask_data)
+        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.mask_callback)
 
         # Define publisher to publish mask image
         self.mask_img_pub = rospy.Publisher("process/mask_img", Image, queue_size=10)
 
         rospy.loginfo("Mask Display Node Started")
+
+    def mask_callback(self, mask_data):
+        # Runs whenever new mask data is received
+
+        # Convert raw mask data from message to usable datatypes
+        self.convert_mask_data(mask_data)
+
+        # Display the mask data overlayed over rgb image
+        self.display_masks()
 
     def convert_mask_data(self, mask_data):
         try:
@@ -64,8 +73,6 @@ class ImageSaverProcessor:
             # Convert rgb image to OpenCV format
             self.mask_image = self.bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
             self.depth_image = self.bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
-
-            self.display_masks()
 
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")

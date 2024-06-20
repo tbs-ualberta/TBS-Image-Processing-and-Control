@@ -23,9 +23,6 @@ TARGET_CONFIDENCE_THRESHOLD = 0.7
 # Select whether the output should be printed to the terminal or not
 PRINT_OUTPUT = False
 
-# Distortion Coefficients
-depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
-
 # --------------------------------------------------------------------------------------------------------------------
 
 # -------------------------------------------- Calculated constants --------------------------------------------------

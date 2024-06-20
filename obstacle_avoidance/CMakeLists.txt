@@ -6,12 +6,13 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  object_detection
 )
 
 catkin_package(
+  CATKIN_DEPENDS geometry_msgs rospy sensor_msgs std_msgs object_detection
 )
 
 include_directories(
-# include
   ${catkin_INCLUDE_DIRS}
 )
