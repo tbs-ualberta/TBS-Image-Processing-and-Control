@@ -58,16 +58,16 @@ class ImageSaver:
         rospy.init_node('img_display', anonymous=True)
 
         # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', Image)
-        self.ir_sub = message_filters.Subscriber('/kinect2/ir_norm', Image)
-        self.reg_sub = message_filters.Subscriber('/kinect2/reg', Image)
+        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', Image)
+        self.ir_sub = message_filters.Subscriber('/rgbd_out/ir_norm', Image)
+        self.reg_sub = message_filters.Subscriber('/rgbd_out/reg', Image)
         self.mask_sub = message_filters.Subscriber('/process/mask_img', Image)
 
         # Choose which topic to subscribe to, depending on whether normalization should be displayed
         if SAVE_NORM:
-            self.depth_sub = message_filters.Subscriber('/kinect2/depth_norm', Image)
+            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_norm', Image)
         else:
-            self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', Image)
+            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', Image)
 
         # Clear the save directory
         self.clear_directory(SAVE_PATH)

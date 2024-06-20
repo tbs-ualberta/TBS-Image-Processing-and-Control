@@ -67,7 +67,7 @@ class ImageProcessor:
         rospy.on_shutdown(self.cleanup)
 
         # Get camera instrinsic data from service
-        get_camera_info = rospy.ServiceProxy('/kinect2/get_camera_info', GetCameraInfo)
+        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
         camera_info = get_camera_info()
 
         # Initialize intrinsic matrices
@@ -101,8 +101,8 @@ class ImageProcessor:
         self.target_pub = rospy.Publisher("process/target", Point, queue_size=10) # in px
 
         # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
-        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', MsgImg)
+        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', MsgImg)
+        self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', MsgImg)
 
         # Synchronize rgb and depth topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)

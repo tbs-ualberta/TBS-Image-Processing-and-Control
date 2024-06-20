@@ -108,7 +108,9 @@ class ImageSaverProcessor:
 
             # Display image in window
             cv2.imshow("Mask Overlay Image", overlay)
-            cv2.imshow("Depth Image", self.depth_image)
+
+            # Uncomment to check if mask is displaying properly - for testing
+            # cv2.imshow("Depth Image", self.depth_image)
 
             cv2.waitKey(1)
 

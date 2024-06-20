@@ -65,8 +65,8 @@ class PoseAssess:
         self.depth_image = None
 
         # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/kinect2/rgb', MsgImg)
-        self.depth_sub = message_filters.Subscriber('/kinect2/depth_raw', MsgImg)
+        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', MsgImg)
+        self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', MsgImg)
 
         # Synchronize the topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)

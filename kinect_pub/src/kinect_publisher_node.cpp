@@ -45,12 +45,12 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     // ROS publishers for RGB and depth images
-    ros::Publisher rgb_pub = nh.advertise<sensor_msgs::Image>("/kinect2/rgb", 1);
-    ros::Publisher depth_raw_pub = nh.advertise<sensor_msgs::Image>("/kinect2/depth_raw", 1);
-    ros::Publisher depth_norm_pub = nh.advertise<sensor_msgs::Image>("/kinect2/depth_norm", 1);
-    ros::Publisher ir_raw_pub = nh.advertise<sensor_msgs::Image>("/kinect2/ir_raw", 1);
-    ros::Publisher ir_norm_pub = nh.advertise<sensor_msgs::Image>("/kinect2/ir_norm", 1);
-    ros::Publisher reg_pub = nh.advertise<sensor_msgs::Image>("/kinect2/reg", 1); // For registration
+    ros::Publisher rgb_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/rgb", 1);
+    ros::Publisher depth_raw_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/depth_raw", 1);
+    ros::Publisher depth_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/depth_norm", 1);
+    ros::Publisher ir_raw_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_raw", 1);
+    ros::Publisher ir_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_norm", 1);
+    ros::Publisher reg_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/reg", 1); // For registration
 
     // Initialize Kinect
     libfreenect2::Freenect2 freenect2;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
     rgbParams = dev->getColorCameraParams();
 
     // Initialize service to send camera intrinsics
-    ros::ServiceServer service = nh.advertiseService("kinect2/get_camera_info", getCameraInfo);
+    ros::ServiceServer service = nh.advertiseService("rgbd_out/get_camera_info", getCameraInfo);
     ROS_INFO("Ready to provide camera info.");
 
     // For registration; this only initializes the registration object, and does not do any processing
