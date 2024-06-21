@@ -6,13 +6,6 @@
 import numpy as np
 # -------------------------------------------- User defined constants ------------------------------------------------
 
-# This specifies the prompt which the model masks
-PROMPT = "person.chair" # multiple objects can be detected using a '.' as a separator
-# PROMPT = "cat"
-
-# Specifies target. This allows for detection of multiple objects but only targetting of one
-TARGET = "person" # must be contained in the prompt
-
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
 # included in this time, so each cycle will be around 0.5s minimum, regardless of the set rate
 PROCESSING_RATE = 1 # in Hz
@@ -35,7 +28,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rospy
 from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
-from object_detection.msg import MaskArray
+from image_processing.msg import MaskArray
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 import os
@@ -62,6 +55,12 @@ class ImageProcessor:
         # Initialize node
         rospy.init_node('image_processor', anonymous=True)
         rospy.on_shutdown(self.cleanup)
+
+        # This specifies the prompt which the model masks
+        self.prompt = rospy.get_param('prompt', 'person.chair')# multiple objects can be detected using a '.' as a separator
+
+        # Specifies target. This allows for detection of multiple objects but only targetting of one
+        self.target = rospy.get_param('target', 'person') # must be contained in the prompt
 
         # Get camera instrinsic data from service
         get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
@@ -140,7 +139,7 @@ class ImageProcessor:
                 time_start = time.time()
 
                 # Calculate masks and bounding boxes for images
-                masks, boxes, phrases, logits = self.model.predict(image_pil, PROMPT)
+                masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
 
                 # Initialize target values
                 target_pos = Point(-1,-1,-1)
@@ -158,7 +157,7 @@ class ImageProcessor:
                                                 self.depth_dist_coeffs, self.extrinsic_matrix) for x, y in centroids_as_pixels]
 
                 # Find target
-                target_pos = find_target(TARGET, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
+                target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
 
                 # Convert to correct message type for publishing
                 mask_array = convert_to_MaskArray(
@@ -177,7 +176,7 @@ class ImageProcessor:
                     # Print data to console
                     if len(masks) == 0:
                         # If no objects detected
-                        rospy.loginfo(f"No objects of the '{PROMPT}' prompt detected in image.")
+                        rospy.loginfo(f"No objects of the '{self.prompt}' prompt detected in image.")
                         # if object is not detected in frame, all target values will be -1 (see above)
 
                     else:

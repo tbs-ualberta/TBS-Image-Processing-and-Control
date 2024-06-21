@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
 
+# Assumes that the object_detection program is detecting "floor" as it's prompt
+# Integrating the target into this program is doable, but the target would have to be detected and mapped as the goal instead of an obstacle.
+
 import rospy
-from object_detection.msg import MaskArray
+from image_processing.msg import MaskArray
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import cv2
 from scipy.ndimage import label
 from kinect_pub.srv import GetCameraInfo
+from scipy.ndimage import measurements
+from process_helper import convert_mask_data
 
 class ObstacleAvoidance:
     def __init__(self):
@@ -22,8 +27,12 @@ class ObstacleAvoidance:
         self.depth_vals = []
         self.logits = []
         self.masks = [] # boolean array
-        self.mask_image = None # RGB image accompanying mask data
+        self.rgb_image = None # RGB image accompanying mask data
         self.depth_image = None # Depth image accompanying mask data
+
+        self.obstacle_masks = [] # stores the negative masks of each detected potential obstacle
+        self.obstacle_masks_avg_depth = [] # stores the average depth of each obstacle
+        self.obstacle_centroids = [] # stores the centroid of each obstacle
 
         # Get camera instrinsic data from service
         get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
@@ -66,53 +75,22 @@ class ObstacleAvoidance:
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
-        self.convert_mask_data(mask_data)
+        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, self.mask_image, self.depth_image = convert_mask_data(mask_data)
 
         # Use masks to calculate average distance of each unmasked section
-        obstacles = self.find_obstacles() # 2D numbered list of obstacles ind(0) - index
-                                                                        # ind(1) - average depth of obstacle
+        self.find_obstacles()
+
+        # Display obstacle image (for testing)
+        self.display_obstacles()
 
         # Use that information to calculate cost function
         # TODO
-
-
-    def convert_mask_data(self, mask_data):
-        try:
-            # Empty arrays
-            self.phrases = []
-            self.centroids = []
-            self.depth_vals = []
-            self.logits = []
-            self.masks = []         # boolean arrays
-            self.mask_image = None  # RGB image accompanying mask data
-            self.depth_image = None # Depth image accompanying mask data
-
-            # Convert data back to accessible data types
-            for temp_mask in mask_data.mask_data:
-                temp_phrase = temp_mask.phrase
-                centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
-                depth_val = temp_mask.centroid.z / 1000
-                temp_logit = temp_mask.logit
-
-                mask_img = self.bridge.imgmsg_to_cv2(temp_mask.mask, desired_encoding="mono8")
-                mask_img = (mask_img / 255).astype(bool)  # Convert back to boolean array
-                
-                self.phrases.append(temp_phrase)
-                self.centroids.append(centroid_loc)
-                self.depth_vals.append(depth_val)
-                self.logits.append(temp_logit)
-                self.masks.append(mask_img)
-
-            # Convert rgb image to OpenCV format
-            self.mask_image = self.bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
-
-        except CvBridgeError as e:
-            rospy.logerr(f"CvBridge Error: {e}")
-        except Exception as e:
-            rospy.logerr(f"Error processing mask data: {e}")
         
     def find_obstacles(self):
+        # TODO this needs to find similar value depth pixels and group them together, then output the average depth of those pixels.
+        # This is necessary, because if the prompt is "floor", anything above the floor will all be considered part of the "negative mask"
+        # and it will not be separated into separate objects.
+
         if not self.masks:
             # If mask array is empty (no prompt detected)
             rospy.loginfo("Mask array empty, no floor detected.")
@@ -127,14 +105,55 @@ class ObstacleAvoidance:
         unmasked_area = np.logical_not(floor_mask)
 
         # Split masks into seperate objects (determine different obstacles)
-        obstacle_masks = split_mask(unmasked_area)
+        self.obstacle_masks = split_mask(unmasked_area)
 
         # Find the average depth (or distance away from the camera) of each mask
-        average_depths = calculate_average_depths(
-            obstacle_masks, self.depth_image, self.rgb_intrinsics, self.depth_intrinsics, self.depth_dist_coeffs, self.extrinsic_matrix)
+        self.obstacle_masks_avg_depth = calculate_average_depths(
+            self.obstacle_masks, self.depth_image, self.rgb_intrinsics, self.depth_intrinsics, self.depth_dist_coeffs, self.extrinsic_matrix)
         
-        return enumerate(average_depths)
+        # Find the centroid of each obstacle mask
+        self.obstacle_centroids = calculate_centroids(self.obstacle_masks)
 
+    def display_obstacles(self):
+        try:
+            if self.rgb_image is None:
+                rospy.logwarn("rgb_image is None, skipping display")
+                return
+            
+            overlay = self.rgb_image.copy()
+            alpha = 0.5  # Transparency factor
+            
+            obstacle_mask_sum = np.zeros_like(self.rgb_image)
+
+            # Convert mask to single array. This allows for even application of colour and the image is not too darkened by multiple masks being overlaid.
+            for mask in self.obstacle_masks:
+                obstacle_mask_scaled = np.zeros_like(self.rgb_image)
+                obstacle_mask_scaled[mask] = [0, 255, 0] # change these values to change colour
+                # Combine arrays
+                obstacle_mask_sum = np.maximum(obstacle_mask_sum, obstacle_mask_scaled)
+
+            # Overlay mask on the image
+            cv2.addWeighted(obstacle_mask_sum, alpha, overlay, 1 - alpha, 0, overlay)
+
+            # Draw centroid and average depth
+            for centroid, avg_depth in zip(self.obstacle_centroids, self.obstacle_masks_avg_depth):
+                # Draw centroid
+                cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
+
+                # Put text for average depth
+                cv2.putText(overlay, str(avg_depth), (centroid[0] + 10, centroid[1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+            # Display image in window
+            cv2.imshow("Obstacle Masks", overlay)
+
+            # Uncomment to check if mask is displaying properly - for testing
+            # cv2.imshow("Depth Image", self.depth_image)
+
+            cv2.waitKey(1)
+
+        except Exception as e:
+            rospy.logerr(f"Error displaying obstacle masks: {e}")
 
     def spin(self):
         rospy.spin()
@@ -206,6 +225,16 @@ def calculate_average_depths(unmasked_areas, depth_image, RGB_INTRINSICS, DEPTH_
 
     return average_depths
 
+def calculate_centroids(masks_np):
+    centroids = []
+    for m in masks_np:
+        centroid = measurements.center_of_mass(m)
+        centroids.append(centroid)
+
+    # convert y,x to x,y
+    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+
+    return centroids_as_pixels
 
 if __name__ == '__main__':
     try:

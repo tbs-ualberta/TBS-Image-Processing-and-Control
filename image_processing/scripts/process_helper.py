@@ -2,7 +2,7 @@
 
 import rospy
 from geometry_msgs.msg import Point
-from object_detection.msg import MaskArray, MaskData
+from image_processing.msg import MaskArray, MaskData
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from scipy.ndimage import measurements
@@ -75,6 +75,46 @@ def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks
     mask_array.rgb_img = bridge.cv2_to_imgmsg(rgb_image, encoding="bgr8")
     mask_array.depth_img = bridge.cv2_to_imgmsg(depth_image, encoding="32FC1")
     return mask_array
+
+def convert_mask_data(mask_data):
+    try:
+        bridge = CvBridge()
+
+        # Empty arrays
+        phrases = []
+        centroids = []
+        depth_vals = []
+        logits = []
+        masks = []  # boolean array
+        mask_image = None  # RGB image accompanying mask data
+        depth_image = None # Depth image accompanying mask data
+
+        # Convert data back to accessible data types
+        for temp_mask in mask_data.mask_data:
+            temp_phrase = temp_mask.phrase
+            centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
+            depth_val = temp_mask.centroid.z / 1000
+            temp_logit = temp_mask.logit
+
+            mask_img = bridge.imgmsg_to_cv2(temp_mask.mask, desired_encoding="mono8")
+            mask_img = (mask_img / 255).astype(bool)  # Convert back to boolean array
+            
+            phrases.append(temp_phrase)
+            centroids.append(centroid_loc)
+            depth_vals.append(depth_val)
+            logits.append(temp_logit)
+            masks.append(mask_img)
+
+        # Convert rgb image to OpenCV format
+        mask_image = bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
+        depth_image = bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
+
+        return phrases, centroids, depth_val, logits, masks, mask_image, depth_image
+
+    except CvBridgeError as e:
+        rospy.logerr(f"CvBridge Error: {e}")
+    except Exception as e:
+        rospy.logerr(f"Error processing mask data: {e}")
 
 # --------------------------------------------- Conversion functions -------------------------------------------------
 

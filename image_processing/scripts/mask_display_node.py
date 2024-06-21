@@ -2,13 +2,14 @@
 # Authored by: Andor Siegers
 
 import rospy
-from object_detection.msg import MaskArray
+from image_processing.msg import MaskArray
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
+from process_helper import convert_mask_data
 
-class ImageSaverProcessor:
+class MaskDisplay:
     def __init__(self):
         self.bridge = CvBridge()
 
@@ -36,48 +37,10 @@ class ImageSaverProcessor:
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
-        self.convert_mask_data(mask_data)
+        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, self.mask_image, self.depth_image = convert_mask_data(mask_data)
 
         # Display the mask data overlayed over rgb image
         self.display_masks()
-
-    def convert_mask_data(self, mask_data):
-        try:
-            # This will display the mask data anytime it is called
-
-            # Empty arrays
-            self.phrases = []
-            self.centroids = []
-            self.depth_vals = []
-            self.logits = []
-            self.masks = []  # boolean array
-            self.mask_image = None  # RGB image accompanying mask data
-            self.depth_image = None # Depth image accompanying mask data
-
-            # Convert data back to accessible data types
-            for temp_mask in mask_data.mask_data:
-                temp_phrase = temp_mask.phrase
-                centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
-                depth_val = temp_mask.centroid.z / 1000
-                temp_logit = temp_mask.logit
-
-                mask_img = self.bridge.imgmsg_to_cv2(temp_mask.mask, desired_encoding="mono8")
-                mask_img = (mask_img / 255).astype(bool)  # Convert back to boolean array
-                
-                self.phrases.append(temp_phrase)
-                self.centroids.append(centroid_loc)
-                self.depth_vals.append(depth_val)
-                self.logits.append(temp_logit)
-                self.masks.append(mask_img)
-
-            # Convert rgb image to OpenCV format
-            self.mask_image = self.bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
-
-        except CvBridgeError as e:
-            rospy.logerr(f"CvBridge Error: {e}")
-        except Exception as e:
-            rospy.logerr(f"Error processing mask data: {e}")
     
     def display_masks(self):
         try:
@@ -129,7 +92,7 @@ class ImageSaverProcessor:
 
 if __name__ == '__main__':
     try:
-        image_saver_processor = ImageSaverProcessor()
+        image_saver_processor = MaskDisplay()
         image_saver_processor.spin()
     except rospy.ROSInterruptException:
         pass
