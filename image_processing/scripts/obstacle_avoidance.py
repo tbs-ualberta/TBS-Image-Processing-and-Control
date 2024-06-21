@@ -9,10 +9,16 @@ from image_processing.msg import MaskArray
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import cv2
-from scipy.ndimage import label
 from kinect_pub.srv import GetCameraInfo
 from scipy.ndimage import measurements
-from process_helper import convert_mask_data
+from process_helper import convert_mask_data, calculate_centroids, calculate_average_depths_from_rgb_mask, split_mask
+from sklearn.cluster import DBSCAN
+
+# ----------------------------------------------------- Constants -------------------------------------------------------
+EPS = 0.05 # for DBSCAN - maximum distance between two points for them to be considered as neighbors (in mm)
+
+MIN_SAMPLES = 10 # for DBSCAN - the minimum number of points required to form a mask
+# -----------------------------------------------------------------------------------------------------------------------
 
 class ObstacleAvoidance:
     def __init__(self):
@@ -84,35 +90,38 @@ class ObstacleAvoidance:
         self.display_obstacles()
 
         # Use that information to calculate cost function
-        # TODO
+        # TODO build a map of the environment and use potential field path planning to find a path
         
     def find_obstacles(self):
         # TODO this needs to find similar value depth pixels and group them together, then output the average depth of those pixels.
         # This is necessary, because if the prompt is "floor", anything above the floor will all be considered part of the "negative mask"
         # and it will not be separated into separate objects.
 
-        if not self.masks:
-            # If mask array is empty (no prompt detected)
-            rospy.loginfo("Mask array empty, no floor detected.")
-            return
-        
-        # Combine all mask areas
-        floor_mask = np.zeros_like(self.masks[0], dtype=bool)
-        for mask in self.masks:
-            floor_mask = np.logical_or(floor_mask, mask)
+        # Uses a DBSCAN (Density-Based Spatial Clustering of Applications with Noise) clustering method to group pixels with similar depth values
+        depth_image = self.depth_image
+        # Preprocess depth image (filter invalid depths)
+        depth_image = depth_image.astype(np.float32)
+        valid_mask = depth_image > 0  # Assuming depth values of 0 are invalid
 
-        # Invert combined mask, to get unmasked area
-        unmasked_area = np.logical_not(floor_mask)
+        # Get the coordinates and depth values of valid pixels
+        coords = np.column_stack(np.nonzero(valid_mask))
+        depth_values = depth_image[coords[:, 0], coords[:, 1]]
+        points = np.column_stack((coords, depth_values))
 
-        # Split masks into seperate objects (determine different obstacles)
-        self.obstacle_masks = split_mask(unmasked_area)
+        # Apply DBSCAN clustering
+        db = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES, metric='euclidean').fit(points)
+        labels = db.labels_
 
-        # Find the average depth (or distance away from the camera) of each mask
-        self.obstacle_masks_avg_depth = calculate_average_depths(
-            self.obstacle_masks, self.depth_image, self.rgb_intrinsics, self.depth_intrinsics, self.depth_dist_coeffs, self.extrinsic_matrix)
-        
-        # Find the centroid of each obstacle mask
-        self.obstacle_centroids = calculate_centroids(self.obstacle_masks)
+        # Create masks for each cluster
+        num_labels = len(set(labels)) - (1 if -1 in labels else 0)
+        masks = [np.zeros(depth_image.shape, dtype=bool) for _ in range(num_labels)]
+
+        for label in range(num_labels):
+            masks[label][coords[labels == label, 0], coords[labels == label, 1]] = True
+
+        # Map masks to rgb image so that floor can be filtered out TODO
+
+        # filter out any masks that are in the floor region
 
     def display_obstacles(self):
         try:
@@ -157,84 +166,6 @@ class ObstacleAvoidance:
 
     def spin(self):
         rospy.spin()
-
-def split_mask(mask, min_connection_width=5):
-    # Dilate the mask to remove narrow connections
-    kernel = np.ones((min_connection_width, min_connection_width), np.uint8)
-    dilated_mask = cv2.dilate(mask.astype(np.uint8), kernel, iterations=1)
-    
-    # Label connected components in the dilated mask
-    labeled_mask, num_labels = label(dilated_mask)
-    
-    # Initialize a list to store the separated masks
-    separated_masks = []
-    
-    for label_index in range(1, num_labels + 1):
-        # Create a mask for the current component
-        component_mask = (labeled_mask == label_index)
-        
-        # Erode back the component mask to restore its original shape
-        eroded_mask = cv2.erode(component_mask.astype(np.uint8), kernel, iterations=1)
-        
-        # Add the eroded mask to the list
-        separated_masks.append(eroded_mask.astype(bool))
-    
-    return separated_masks
-
-def calculate_average_depths(unmasked_areas, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
-    average_depths = []
-
-    for unmasked_area in unmasked_areas:
-        # Get the coordinates of the unmasked pixels
-        unmasked_coords = np.argwhere(unmasked_area)
-        if len(unmasked_coords) == 0:
-            average_depths.append(None)
-            continue
-        
-        # Normalize the RGB pixel coordinates
-        normalized_rgb_points = np.linalg.inv(RGB_INTRINSICS).dot(
-            np.vstack((unmasked_coords[:, 1], unmasked_coords[:, 0], np.ones(unmasked_coords.shape[0])))
-        )
-
-        # Transform the normalized points to the depth camera coordinate system
-        points_3d_rgb = np.vstack((normalized_rgb_points[0], normalized_rgb_points[1], np.ones(normalized_rgb_points.shape[1]), np.ones(normalized_rgb_points.shape[1])))
-        points_3d_depth = np.linalg.inv(EXTRINSIC_MATRIX).dot(points_3d_rgb)
-        points_3d_depth /= points_3d_depth[3]  # Normalize homogeneous coordinates
-
-        # Project the 3D points to the 2D depth image plane
-        x_d = (points_3d_depth[0] * DEPTH_INTRINSICS[0, 0] / points_3d_depth[2]) + DEPTH_INTRINSICS[0, 2]
-        y_d = (points_3d_depth[1] * DEPTH_INTRINSICS[1, 1] / points_3d_depth[2]) + DEPTH_INTRINSICS[1, 2]
-
-        # Undistort the depth points
-        depth_points = np.vstack((x_d, y_d)).T
-        undistorted_depth_points = cv2.undistortPoints(np.array([depth_points], dtype=np.float32), DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, P=DEPTH_INTRINSICS)
-        undistorted_depth_points = undistorted_depth_points[0]
-
-        # Retrieve the depth values
-        depth_values = []
-        for x, y in undistorted_depth_points:
-            if 0 <= int(x) < depth_image.shape[1] and 0 <= int(y) < depth_image.shape[0]:
-                depth_values.append(depth_image[int(y), int(x)])
-        
-        # Calculate the average depth
-        if depth_values:
-            average_depth = np.mean(depth_values)
-            average_depths.append(average_depth)
-        else:
-            average_depths.append(None)
-
-    return average_depths
-
-def calculate_centroids(masks_np):
-    centroids = []
-    for m in masks_np:
-        centroid = measurements.center_of_mass(m)
-        centroids.append(centroid)
-
-    # convert y,x to x,y
-    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
-
-    return centroids_as_pixels
 
 if __name__ == '__main__':
     try:
