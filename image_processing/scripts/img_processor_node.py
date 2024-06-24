@@ -68,7 +68,7 @@ class ImageProcessor:
         # Define subscribers for registration data (which includes rgb and depth images)
         self.reg_sub = rospy.Subscriber('rgbd_out/reg_data', RegistrationData, self.callback)
 
-        # Initialize images
+        # Initialize registration data message
         self.reg_data = None
 
         # Initialize model
@@ -80,82 +80,84 @@ class ImageProcessor:
         rospy.loginfo("Image Processor Node Started")
 
     def process_images(self, event):
-        if self.reg_data is not None:
-            # rospy.loginfo("Processing images")
-            try:
-                prediction_reg_data = self.reg_data
-                # Unpack data from message data type
-                rgb_image, depth_image, __, prediction_bigdepth_image, __ = unpack_RegistrationData(prediction_reg_data)
+        if self.reg_data is None:
+            return
+        
+        # rospy.loginfo("Processing images")
+        try:
+            prediction_reg_data = self.reg_data
+            # Unpack data from message data type
+            rgb_image, depth_image, __, prediction_bigdepth_image, __ = unpack_RegistrationData(prediction_reg_data)
 
-                # For publishing mask and centroid data
-                mask_array = MaskArray() 
+            # For publishing mask and centroid data
+            mask_array = MaskArray() 
 
-                # Convert image to PIL format
-                image_pil = PilImg.fromarray(rgb_image)
+            # Convert image to PIL format
+            image_pil = PilImg.fromarray(rgb_image)
+            
+            # Resize PIL image
+            w, h = image_pil.size
+            new_w, new_h = w // 1, h // 1
+            image_pil = image_pil.resize((new_w, new_h), PilImg.ANTIALIAS)
+
+            # Save start time (to evaluate process time)
+            time_start = time.time()
+
+            # Calculate masks and bounding boxes for images
+            masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
+
+            # Initialize target values
+            target_pos = Point(-1,-1,-1)
+
+            # Convert masks to numpy arrays
+            masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
                 
-                # Resize PIL image
-                w, h = image_pil.size
-                new_w, new_h = w // 1, h // 1
-                image_pil = image_pil.resize((new_w, new_h), PilImg.ANTIALIAS)
+            # Calculate the centroids of each mask
+            centroids_as_pixels = []
+            centroids_as_pixels = calculate_centroids(masks_np)
 
-                # Save start time (to evaluate process time)
-                time_start = time.time()
+            # Find corresponding RGB values from pixel coordinates
+            depth_vals = []
+            depth_vals = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
 
-                # Calculate masks and bounding boxes for images
-                masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
+            # Find target
+            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
 
-                # Initialize target values
-                target_pos = Point(-1,-1,-1)
+            # Convert to correct message type for publishing
+            mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_reg_data)
+            
+            # Publish target values
+            self.target_pub.publish(target_pos)
 
-                # Convert masks to numpy arrays
-                masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
-                    
-                # Calculate the centroids of each mask
-                centroids_as_pixels = []
-                centroids_as_pixels = calculate_centroids(masks_np)
+            # Publish mask data
+            self.mask_pub.publish(mask_array)
 
-                # Find corresponding RGB values from pixel coordinates
-                depth_vals = []
-                depth_vals = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
+            if PRINT_OUTPUT:
+                # Clear the console for new output
+                os.system('clear')
 
-                # Find target
-                target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
+                # Print data to console
+                if len(masks) == 0:
+                    # If no objects detected
+                    rospy.loginfo(f"No objects of the '{self.prompt}' prompt detected in image.")
+                    # if object is not detected in frame, all target values will be -1 (see above)
 
-                # Convert to correct message type for publishing
-                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_reg_data)
-                
-                # Publish target values
-                self.target_pub.publish(target_pos)
+                else:
+                    # If at least one object detected
 
-                # Publish mask data
-                self.mask_pub.publish(mask_array)
-
-                if PRINT_OUTPUT:
-                    # Clear the console for new output
-                    os.system('clear')
-
-                    # Print data to console
-                    if len(masks) == 0:
-                        # If no objects detected
-                        rospy.loginfo(f"No objects of the '{self.prompt}' prompt detected in image.")
-                        # if object is not detected in frame, all target values will be -1 (see above)
-
-                    else:
-                        # If at least one object detected
-
-                        # Print calculated data to console
-                        print("-------------------------------------------------------------------------------------------------")
-                        for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
-                            # Print info
-                            rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
-                            rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
-                            print("-------------------------------------------------------------------------------------------------")
-
-                    rospy.loginfo(f"Total processing time: {time.time() - time_start}")
+                    # Print calculated data to console
                     print("-------------------------------------------------------------------------------------------------")
+                    for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
+                        # Print info
+                        rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
+                        rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
+                        print("-------------------------------------------------------------------------------------------------")
 
-            except (requests.exceptions.RequestException, IOError) as e:
-                rospy.logerr(f"Error: {e}")
+                rospy.loginfo(f"Total processing time: {time.time() - time_start}")
+                print("-------------------------------------------------------------------------------------------------")
+
+        except (requests.exceptions.RequestException, IOError) as e:
+            rospy.logerr(f"Error: {e}")
 
     def callback(self, reg_data):
         # Unpack registration data

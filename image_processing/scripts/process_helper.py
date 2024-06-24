@@ -188,6 +188,36 @@ def split_mask(mask, min_connection_width=5):
     
     return separated_masks
 
+def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
+    # Initialize mask to fill
+    rgb_mask = np.zeros(rgb_image.shape, dtype=bool)
+
+    # Get coordinates of mask in depth image space
+    depth_coords = np.column_stack(np.nonzero(depth_mask))
+
+    for coord in depth_coords:
+        depth_y, depth_x = coord
+        color_index = colour_depth_map[depth_y, depth_x]  # Get the corresponding index in the RGB image
+
+        if color_index < depth_image.size:
+            color_y, color_x = np.unravel_index(color_index, rgb_image.shape[:2])  # Convert linear index to 2D coordinates
+            rgb_mask[color_y, color_x] = True  # Mark the corresponding position in the RGB mask
+
+    return rgb_mask
+
+def is_mask_overlapping(mask, overlap_masks, OVERLAP_THRESHOLD):
+    '''
+    Calculates whether mask is overlaping any of overlap_masks by the overlap threshold
+    mask - mask that is being checked
+    overlap_masks - masks that mask cannot overlap
+    OVERLAP_THRESHOLD - percentage of mask that needs to overlap before it is considered "overlapping" (0.0-1.0)
+    '''
+    
+    for existing_mask in overlap_masks:
+        overlap = np.logical_and(mask, existing_mask).sum()
+        if overlap / mask.sum() >= OVERLAP_THRESHOLD:
+            return True
+    return False
 # ------------------------------------------------ Mask Processing ---------------------------------------------------
 
 # -------------------------------------------- Centroid calculation --------------------------------------------------

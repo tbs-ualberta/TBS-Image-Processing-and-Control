@@ -166,15 +166,15 @@ int main(int argc, char **argv)
 
         kinect_pub::RegistrationData registration_data_msg;
 
-        registration_data_msg.rgb_image = *rgb_msg;
-        registration_data_msg.depth_image = *depth_raw_msg;
-        registration_data_msg.registered_image = *reg_img_msg;
-        registration_data_msg.bigdepth_image = *big_depth_msg;
+        registration_data_msg.rgb_image = *rgb_msg; // RGB image
+        registration_data_msg.depth_image = *depth_raw_msg; // Depth image
+        registration_data_msg.registered_image = *reg_img_msg; // RGB image mapped to depth image
+        registration_data_msg.bigdepth_image = *big_depth_msg; // Maps depth onto RGB
 
-        // Fill color_depth_map
+        // Fill colour_depth_map
         for (int i = 0; i < 512 * 424; ++i)
         {
-            registration_data_msg.colour_depth_map.push_back(colour_depth_map[i]);
+            registration_data_msg.colour_depth_map.push_back(colour_depth_map[i]); // Maps RGB onto depth
         }
         
         // Publish registration data
