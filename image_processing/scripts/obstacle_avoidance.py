@@ -11,7 +11,7 @@ import numpy as np
 import cv2
 from kinect_pub.srv import GetCameraInfo
 from scipy.ndimage import measurements
-from process_helper import convert_mask_data, calculate_centroids, calculate_average_depths_from_rgb_mask, split_mask
+from process_helper import convert_mask_data, calculate_centroids, calculate_average_depths_from_rgb_mask, split_mask, convert_to_matrices
 from sklearn.cluster import DBSCAN
 
 # ----------------------------------------------------- Constants -------------------------------------------------------
@@ -47,28 +47,12 @@ class ObstacleAvoidance:
         # Initialize intrinsic matrices
         self.rgb_intrinsics = np.zeros((3,3))
         self.depth_intrinsics = np.zeros((3,3))
+        self.rgb_dist_coeffs = np.zeros(5)
         self.depth_dist_coeffs = np.zeros(5)
         self.extrinsic_matrix = np.zeros((3,3))
         
-        if camera_info:
-            # Construct the intrinsic matrices
-            self.rgb_intrinsics = np.array([[camera_info.rgb_fx, 0, camera_info.rgb_cx],
-                                    [0, camera_info.rgb_fy, camera_info.rgb_cy],
-                                    [0, 0, 1]])
-            
-            self.depth_intrinsics = np.array([[camera_info.ir_fx, 0, camera_info.ir_cx],
-                                        [0, camera_info.ir_fy, camera_info.ir_cy],
-                                        [0, 0, 1]])
-            
-            # Manual input for distortion coefficients
-            self.depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
-
-            # Construct extrinsic matrix
-            R = np.eye(3)  # Rotation matrix (3x3)
-            T = np.array([0, 0, 0])  # Translation vector (3x1)
-            self.extrinsic_matrix = np.eye(4)
-            self.extrinsic_matrix[:3, :3] = R
-            self.extrinsic_matrix[:3, 3] = T
+        # Convert intrinsic data to matrices for later use
+        self.rgb_intrinsics, self.depth_intrinsics, self.rgb_dist_coeffs, self.depth_dist_coeffs, self.extrinsic_matrix = convert_to_matrices(camera_info)
         
         # Define subscriber for mask data
         self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.mask_callback)

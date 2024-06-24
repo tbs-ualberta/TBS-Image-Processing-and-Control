@@ -68,6 +68,38 @@ def convert_mask_data(mask_data):
     except Exception as e:
         rospy.logerr(f"Error processing mask data: {e}")
 
+def convert_to_matrices(camera_info):
+    # Initialize intrinsic matrices
+    rgb_intrinsics = np.zeros((3,3))
+    depth_intrinsics = np.zeros((3,3))
+    rgb_dist_coeffs = np.zeros(5)
+    depth_dist_coeffs = np.zeros(5)
+    extrinsic_matrix = np.zeros((3,3))
+
+    if camera_info:
+        # Construct the intrinsic matrices
+        rgb_intrinsics = np.array([[camera_info.rgb_fx, 0, camera_info.rgb_cx],
+                                [0, camera_info.rgb_fy, camera_info.rgb_cy],
+                                [0, 0, 1]])
+        
+        depth_intrinsics = np.array([[camera_info.ir_fx, 0, camera_info.ir_cx],
+                                    [0, camera_info.ir_fy, camera_info.ir_cy],
+                                    [0, 0, 1]])
+        rgb_dist_coeffs = np.array([3.823e-3, 3.149e-4, 2.332e-4, -5.152e-4]) # from: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4701245/
+        depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
+        
+
+        # Construct extrinsic matrix
+        R = np.eye(3)  # Rotation matrix (3x3)
+        T = np.array([0, 0, 0])  # Translation vector (3x1)
+        extrinsic_matrix = np.eye(4)
+        extrinsic_matrix[:3, :3] = R
+        extrinsic_matrix[:3, 3] = T
+
+    else:
+        rospy.logwarn("Unable to get camera info. Intrinsic matrices are empty.")
+
+    return rgb_intrinsics, depth_intrinsics, rgb_dist_coeffs, depth_dist_coeffs, extrinsic_matrix
 # --------------------------------------------- Conversion functions -------------------------------------------------
 
 # ------------------------------------------------ Mask Processing ---------------------------------------------------
@@ -111,7 +143,7 @@ def calculate_centroids(masks_np):
 
 # -------------------------------------------- Centroid calculation --------------------------------------------------
 
-# ---------------------------------------------- Depth calculation ---------------------------------------------------
+# ------------------------------------------ Transformation functions ------------------------------------------------
 def map_rgb_to_depth(rgb_x, rgb_y, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
         # Map an RGB pixel to the corresponding depth pixel and retrieve the depth value.
         # Check if RGB pixel is within image bounds
@@ -143,15 +175,16 @@ def map_rgb_to_depth(rgb_x, rgb_y, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS
             rospy.logerr("The computed depth pixel is out of bounds.")
             return -1
 
-def map_depth_to_rgb(depth_x, depth_y, depth_value, RGB_INTRINSICS, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
-    # NOTE: this does not use undistortion, as I could not figure out how to get RGB distortion coefficients. This should be looked into further TODO
-
-    # Step 1: Normalize the depth pixel coordinates
-    normalized_depth_point = np.linalg.inv(DEPTH_INTRINSICS).dot([depth_x * depth_value, depth_y * depth_value, depth_value])
+def map_depth_to_rgb(depth_x, depth_y, depth_value, RGB_INTRINSICS, DEPTH_INTRINSICS, RGB_DIST_COEFFS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
+    # Step 1: Normalize the depth pixel coordinates and undistort
+    normalized_depth_point = np.array([[depth_x, depth_y]], dtype=np.float32)
+    undistorted_depth_point = cv2.undistortPoints(normalized_depth_point, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, P=DEPTH_INTRINSICS)
+    undistorted_depth_x, undistorted_depth_y = undistorted_depth_point[0, 0]
+    point_3d_depth = np.linalg.inv(DEPTH_INTRINSICS).dot([undistorted_depth_x * depth_value, undistorted_depth_y * depth_value, depth_value])
 
     # Step 2: Transform the normalized point to the RGB camera coordinate system
-    point_3d_depth = np.array([normalized_depth_point[0], normalized_depth_point[1], normalized_depth_point[2], 1])
-    point_3d_rgb = EXTRINSIC_MATRIX.dot(point_3d_depth)
+    point_3d_depth_homogeneous = np.append(point_3d_depth, 1)  # Convert to homogeneous coordinates
+    point_3d_rgb = EXTRINSIC_MATRIX.dot(point_3d_depth_homogeneous)
     point_3d_rgb /= point_3d_rgb[3]  # Normalize homogeneous coordinates
 
     # Step 3: Project the 3D point to the 2D RGB image plane
@@ -159,12 +192,13 @@ def map_depth_to_rgb(depth_x, depth_y, depth_value, RGB_INTRINSICS, DEPTH_INTRIN
     y_rgb = (point_3d_rgb[1] * RGB_INTRINSICS[1, 1] / point_3d_rgb[2]) + RGB_INTRINSICS[1, 2]
 
     # Step 4: Undistort the RGB point
-    undistorted_rgb_point = cv2.undistortPoints(np.array([[x_rgb, y_rgb]], dtype=np.float32), RGB_INTRINSICS, None, P=RGB_INTRINSICS)
+    undistorted_rgb_point = cv2.undistortPoints(np.array([[x_rgb, y_rgb]], dtype=np.float32), RGB_INTRINSICS, RGB_DIST_COEFFS, P=RGB_INTRINSICS)
     rgb_x, rgb_y = undistorted_rgb_point[0, 0]
     
     return int(rgb_x), int(rgb_y)
+# ------------------------------------------ Transformation functions ------------------------------------------------
 
-
+# ---------------------------------------------- Depth calculation ---------------------------------------------------
 def calculate_average_depths_from_rgb_mask(masks, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
     # Calculate the average depth in each mask
     average_depths = []

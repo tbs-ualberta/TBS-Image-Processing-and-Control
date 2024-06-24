@@ -11,6 +11,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include "kinect_pub/GetCameraInfo.h"
+#include "kinect_pub/RegistrationData.h"
 
 // ------------------------------- User defined constants -------------------------------
 
@@ -38,6 +39,14 @@ bool getCameraInfo(kinect_pub::GetCameraInfo::Request &req,
     return true;
 }
 
+// To convert registration data
+sensor_msgs::ImagePtr frameToImageMsg(const libfreenect2::Frame *frame, const std::string &encoding)
+{
+    cv::Mat image(frame->height, frame->width, CV_8UC4, frame->data);
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), encoding, image).toImageMsg();
+    return msg;
+}
+
 int main(int argc, char **argv)
 {
     // setup ROS node
@@ -50,7 +59,7 @@ int main(int argc, char **argv)
     ros::Publisher depth_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/depth_norm", 1);
     ros::Publisher ir_raw_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_raw", 1);
     ros::Publisher ir_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_norm", 1);
-    ros::Publisher reg_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/reg", 1); // For registration
+    ros::Publisher reg_pub = nh.advertise<kinect_pub::RegistrationData>("/rgbd_out/reg_data", 1); // For registration data
 
     // Initialize Kinect
     libfreenect2::Freenect2 freenect2;
@@ -96,8 +105,8 @@ int main(int argc, char **argv)
     // For registration; this only initializes the registration object, and does not do any processing
     libfreenect2::Registration* registration = new libfreenect2::Registration(irParams, rgbParams);
     libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
-    libfreenect2::Frame bigdepth(1920, 1080 + 2, 4);
-    int colour_depth_ind [512 * 424];
+    libfreenect2::Frame bigdepth(1920, 1080 + 2, 4); // mapping of depth onto colour pixels
+    int colour_depth_map [512 * 424]; // index of mapped colour pixel for each depth pixel
     
 
     ros::Rate loop_rate(LOOP_RATE);
@@ -147,16 +156,31 @@ int main(int argc, char **argv)
         sensor_msgs::ImagePtr ir_norm_msg = cv_bridge::CvImage(std_msgs::Header(), "32FC1", ir_normalized).toImageMsg();
         ir_norm_pub.publish(ir_norm_msg);
 
-
+        // Calculate, convert, and publish registered frame
         // Process registered frame
-        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_ind);
+        registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_map);
 
-        // Convert registered frame to ROS message and publish
-        cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);
-        sensor_msgs::ImagePtr reg_msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", reg_image).toImageMsg();
-        reg_pub.publish(reg_msg);
+        // Convert to message types
+        sensor_msgs::ImagePtr reg_img_msg = frameToImageMsg(&registered, sensor_msgs::image_encodings::BGR8);
+        sensor_msgs::ImagePtr big_depth_msg = frameToImageMsg(&bigdepth, sensor_msgs::image_encodings::TYPE_32FC1);
+
+        kinect_pub::RegistrationData registration_data_msg;
+
+        registration_data_msg.rgb_image = *rgb_msg;
+        registration_data_msg.depth_image = *depth_raw_msg;
+        registration_data_msg.registered_image = *reg_img_msg;
+        registration_data_msg.bigdepth_image = *big_depth_msg;
+
+        // Fill color_depth_map
+        for (int i = 0; i < 512 * 424; ++i)
+        {
+            registration_data_msg.colour_depth_map.push_back(colour_depth_map[i]);
+        }
         
-        
+        // Publish registration data
+        reg_pub.publish(registration_data_msg);
+
+
         listener.release(frames);
 
         ros::spinOnce();

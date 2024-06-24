@@ -30,9 +30,15 @@ add_service_files(
   GetCameraInfo.srv
 )
 
+add_message_files(
+  FILES
+  RegistrationData.msg
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
+  sensor_msgs
 )
 
 # Find PCL
@@ -45,7 +51,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 catkin_package(
-  CATKIN_DEPENDS roscpp sensor_msgs cv_bridge message_runtime
+  CATKIN_DEPENDS roscpp sensor_msgs cv_bridge message_runtime std_msgs
 )
 
 include_directories(
