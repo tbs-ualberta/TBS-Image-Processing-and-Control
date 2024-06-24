@@ -7,6 +7,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from scipy.ndimage import measurements, label
 import cv2
+from kinect_pub.msg import RegistrationData
 
 # --------------------------------------------- Conversion functions -------------------------------------------------
 def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, rgb_image, depth_image):
@@ -61,7 +62,7 @@ def convert_mask_data(mask_data):
         mask_image = bridge.imgmsg_to_cv2(mask_data.rgb_img, desired_encoding="bgr8")
         depth_image = bridge.imgmsg_to_cv2(mask_data.depth_img, desired_encoding="32FC1")
 
-        return phrases, centroids, depth_val, logits, masks, mask_image, depth_image
+        return phrases, centroids, depth_vals, logits, masks, mask_image, depth_image
 
     except CvBridgeError as e:
         rospy.logerr(f"CvBridge Error: {e}")
@@ -100,6 +101,44 @@ def convert_to_matrices(camera_info):
         rospy.logwarn("Unable to get camera info. Intrinsic matrices are empty.")
 
     return rgb_intrinsics, depth_intrinsics, rgb_dist_coeffs, depth_dist_coeffs, extrinsic_matrix
+
+def unpack_registration_data(data):
+    # Unpacks registration data from custom message structure
+    bridge = CvBridge()
+    # Convert RGB Image
+    try:
+        rgb_image = bridge.imgmsg_to_cv2(data.rgb_image, "bgra8")
+        rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGRA2BGR)  # Convert to BGR
+    except Exception as e:
+        rospy.logerr("Error converting RGB image: %s", e)
+
+    # Convert Depth Image
+    try:
+        depth_image = bridge.imgmsg_to_cv2(data.depth_image, "32FC1")
+    except Exception as e:
+        rospy.logerr("Error converting Depth image: %s", e)
+
+    # Convert Registered Image
+    try:
+        registered_image = bridge.imgmsg_to_cv2(data.registered_image, "bgra8")
+    except Exception as e:
+        rospy.logerr("Error converting Registered image: %s", e)
+
+    # Convert Bigdepth Image
+    try:
+        bigdepth_image = bridge.imgmsg_to_cv2(data.bigdepth_image, "32FC1")
+        bigdepth_image = np.array(bigdepth_image.data, dtype=np.float32).reshape((1082, 1920))
+    except Exception as e:
+        rospy.logerr("Error converting Bigdepth image: %s", e)
+
+    # Convert Colour Depth Map
+    try:
+        colour_depth_map = np.array(data.colour_depth_map, dtype=np.int32).reshape((424, 512))
+    except Exception as e:
+        rospy.logerr("Error converting Color Depth Map: %s", e)
+
+    return rgb_image, depth_image, registered_image, bigdepth_image, colour_depth_map
+
 # --------------------------------------------- Conversion functions -------------------------------------------------
 
 # ------------------------------------------------ Mask Processing ---------------------------------------------------
@@ -174,6 +213,7 @@ def map_rgb_to_depth(rgb_x, rgb_y, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS
         else:
             rospy.logerr("The computed depth pixel is out of bounds.")
             return -1
+        
 
 def map_depth_to_rgb(depth_x, depth_y, depth_value, RGB_INTRINSICS, DEPTH_INTRINSICS, RGB_DIST_COEFFS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
     # Step 1: Normalize the depth pixel coordinates and undistort

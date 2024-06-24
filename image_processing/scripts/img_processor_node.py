@@ -38,10 +38,11 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from process_helper import map_rgb_to_depth, calculate_centroids, find_target, convert_to_MaskArray, convert_to_matrices
+from process_helper import map_rgb_to_depth, calculate_centroids, find_target, convert_to_MaskArray, convert_to_matrices, unpack_registration_data
 import warnings
 from transformers import logging
 from kinect_pub.srv import GetCameraInfo
+from kinect_pub.msg import RegistrationData
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -82,17 +83,14 @@ class ImageProcessor:
         # Define publisher for target position data
         self.target_pub = rospy.Publisher("process/target", Point, queue_size=10) # in px
 
-        # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', MsgImg)
-        self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', MsgImg)
-
-        # Synchronize rgb and depth topics
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 1.0)
-        self.ts.registerCallback(self.callback)
+        # Define subscribers for registration data (which includes rgb and depth images)
+        self.reg_sub = rospy.Subscriber('rgbd_out/reg_data', RegistrationData, self.callback)
 
         # Initialize images
         self.rgb_image = None
         self.depth_image = None
+        self.bigdepth_image = None
+        self.colour_depth_map = None
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
@@ -137,10 +135,9 @@ class ImageProcessor:
                 centroids_as_pixels = []
                 centroids_as_pixels = calculate_centroids(masks_np)
 
-                # Calculate corresponding depth values from RGB pixel coordinates
+                # Find corresponding RGB values from pixel coordinates
                 depth_vals = []
-                depth_vals = [map_rgb_to_depth(x, y, self.depth_image, self.rgb_intrinsics, self.depth_intrinsics, 
-                                                self.depth_dist_coeffs, self.extrinsic_matrix) for x, y in centroids_as_pixels]
+                depth_vals = [self.bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
 
                 # Find target
                 target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
@@ -188,14 +185,9 @@ class ImageProcessor:
             self.rgb_image = None
             self.depth_image = None
 
-    def callback(self, rgb_msg, depth_msg):
-        try:
-            # Convert the rgb and depth images to OpenCV format
-            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
-
-        except CvBridgeError as e:
-            rospy.logerr(f"Failed to convert images: {e}")
+    def callback(self, reg_data):
+        # Unpack registration data
+        self.rgb_image, self.depth_image, __, self.bigdepth_image, self.colour_depth_map = unpack_registration_data(reg_data)
 
     def cleanup(self):
         rospy.loginfo("Shutting down Image Processor Node")

@@ -1,7 +1,7 @@
 <launch>
   <!-- Parameter definitions -->
-  <param name="prompt" value="floor" />
-  <param name="target" value="floor" />
+  <param name="prompt" value="person.chair" />
+  <param name="target" value="person" />
 
   <!-- Arguments to enable or disable nodes -->
   <arg name="run_img_display" default="false" />

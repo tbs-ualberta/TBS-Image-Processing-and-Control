@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
-
+# TODO adapt this for new registration
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # Directory to save images
