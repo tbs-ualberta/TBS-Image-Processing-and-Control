@@ -7,7 +7,8 @@ from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from process_helper import convert_mask_data
+from process_helper import unpack_MaskArray, unpack_RegistrationData
+from kinect_pub.msg import RegistrationData
 
 class MaskDisplay:
     def __init__(self):
@@ -22,7 +23,7 @@ class MaskDisplay:
         self.depth_vals = []
         self.logits = []
         self.masks = [] # boolean array
-        self.mask_image = None # RGB image accompanying mask data
+        self.rgb_image = None # RGB image accompanying mask data
         self.depth_image = None # Depth image accompanying mask data
 
         # Define subscriber for masks
@@ -36,26 +37,28 @@ class MaskDisplay:
     def mask_callback(self, mask_data):
         # Runs whenever new mask data is received
 
+        reg_data = None
         # Convert raw mask data from message to usable datatypes
-        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, self.mask_image, self.depth_image = convert_mask_data(mask_data)
+        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, reg_data = unpack_MaskArray(mask_data)
+        self.rgb_image, self.depth_image, __, __, __ = unpack_RegistrationData(reg_data)
 
         # Display the mask data overlayed over rgb image
         self.display_masks()
     
     def display_masks(self):
         try:
-            if self.mask_image is None:
-                rospy.logwarn("mask_image is None, skipping display")
+            if self.rgb_image is None:
+                rospy.logwarn("rgb_image is None, skipping display")
                 return
             
-            overlay = self.mask_image.copy()
+            overlay = self.rgb_image.copy()
             alpha = 0.5  # Transparency factor
             
-            mask_sum = np.zeros_like(self.mask_image)
+            mask_sum = np.zeros_like(self.rgb_image)
 
             # Convert mask to single array. This allows for even application of colour and the image is not too darkened by multiple masks being overlaid.
             for mask, logit in zip(self.masks, self.logits):
-                mask_scaled = np.zeros_like(self.mask_image)
+                mask_scaled = np.zeros_like(self.rgb_image)
                 # Scale proportionally to confidence value
                 scaled_val = logit * 225
                 mask_scaled[mask] = [0, scaled_val, 0] # change these values to change colour
@@ -67,7 +70,7 @@ class MaskDisplay:
 
             for centroid, phrase, depth, logit in zip(self.centroids, self.phrases, self.depth_vals, self.logits):
                 # Draw centroid
-                cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
+                cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red colour for centroid
 
                 # Put text for phrase and depth value
                 cv2.putText(overlay, f"{phrase}, {depth:.2f}m", (centroid[0] + 10, centroid[1] - 10),

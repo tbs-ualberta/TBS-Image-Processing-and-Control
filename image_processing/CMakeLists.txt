@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   sensor_msgs
   message_generation
+  kinect_pub
 )
 
 add_message_files(
@@ -27,35 +28,18 @@ generate_messages(
   std_msgs
   geometry_msgs
   sensor_msgs
+  kinect_pub
 )
 
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs sensor_msgs
+  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs sensor_msgs kinect_pub
 )
 
-###########
-## Build ##
-###########
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
 )
-
-#############
-## Install ##
-#############
 
 catkin_install_python(PROGRAMS scripts/img_processor_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

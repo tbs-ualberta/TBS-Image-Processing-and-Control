@@ -11,7 +11,7 @@ import numpy as np
 import cv2
 from kinect_pub.srv import GetCameraInfo
 from scipy.ndimage import measurements
-from process_helper import convert_mask_data, calculate_centroids, calculate_average_depths_from_rgb_mask, split_mask, convert_to_matrices
+from process_helper import unpack_MaskArray, calculate_centroids, calculate_average_depths_from_rgb_mask, split_mask, convert_to_matrices
 from sklearn.cluster import DBSCAN
 
 # ----------------------------------------------------- Constants -------------------------------------------------------
@@ -65,7 +65,7 @@ class ObstacleAvoidance:
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
-        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, self.mask_image, self.depth_image = convert_mask_data(mask_data)
+        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, self.mask_image, self.depth_image = unpack_MaskArray(mask_data)
 
         # Use masks to calculate average distance of each unmasked section
         self.find_obstacles()

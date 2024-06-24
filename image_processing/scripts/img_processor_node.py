@@ -3,7 +3,6 @@
 # using transformers-4.27.4 and huggingface-hub-0.16.4
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues when tested
 
-import numpy as np
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
@@ -26,10 +25,8 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 # --------------------------------------------------------------------------------------------------------------------
 
 import rospy
-from sensor_msgs.msg import Image as MsgImg
 from geometry_msgs.msg import Point
 from image_processing.msg import MaskArray
-import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 import os
 import sys
@@ -38,10 +35,9 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from process_helper import map_rgb_to_depth, calculate_centroids, find_target, convert_to_MaskArray, convert_to_matrices, unpack_registration_data
+from process_helper import calculate_centroids, find_target, convert_to_MaskArray, convert_to_RegistrationData, unpack_RegistrationData
 import warnings
 from transformers import logging
-from kinect_pub.srv import GetCameraInfo
 from kinect_pub.msg import RegistrationData
 
 # Suppress unimportant messages printing to the console
@@ -62,21 +58,7 @@ class ImageProcessor:
 
         # Specifies target. This allows for detection of multiple objects but only targetting of one
         self.target = rospy.get_param('target', 'person') # must be contained in the prompt
-
-        # Get camera instrinsic data from service
-        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
-        camera_info = get_camera_info()
-
-        # Initialize intrinsic matrices
-        self.rgb_intrinsics = np.zeros((3,3))
-        self.depth_intrinsics = np.zeros((3,3))
-        self.rgb_dist_coeffs = np.zeros(5)
-        self.depth_dist_coeffs = np.zeros(5)
-        self.extrinsic_matrix = np.zeros((3,3))
         
-        # Convert intrinsic data to matrices for later use
-        self.rgb_intrinsics, self.depth_intrinsics, self.rgb_dist_coeffs, self.depth_dist_coeffs, self.extrinsic_matrix = convert_to_matrices(camera_info)
-
         # Define publisher for mask data
         self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
 
@@ -87,10 +69,7 @@ class ImageProcessor:
         self.reg_sub = rospy.Subscriber('rgbd_out/reg_data', RegistrationData, self.callback)
 
         # Initialize images
-        self.rgb_image = None
-        self.depth_image = None
-        self.bigdepth_image = None
-        self.colour_depth_map = None
+        self.reg_data = None
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
@@ -101,19 +80,19 @@ class ImageProcessor:
         rospy.loginfo("Image Processor Node Started")
 
     def process_images(self, event):
-        if self.rgb_image is not None and self.depth_image is not None:
+        if self.reg_data is not None:
             # rospy.loginfo("Processing images")
             try:
-                # -----------------------------Process Images----------------------------------
+                prediction_reg_data = self.reg_data
+                # Unpack data from message data type
+                rgb_image, depth_image, __, prediction_bigdepth_image, __ = unpack_RegistrationData(prediction_reg_data)
 
-                mask_array = MaskArray() # for publishing mask and centroid data
+                # For publishing mask and centroid data
+                mask_array = MaskArray() 
 
                 # Convert image to PIL format
-                image_pil = PilImg.fromarray(self.rgb_image)
-                # Save image being processed to save alongside masks
-                prediction_image_rgb = self.rgb_image
-                prediction_image_depth = self.depth_image
-
+                image_pil = PilImg.fromarray(rgb_image)
+                
                 # Resize PIL image
                 w, h = image_pil.size
                 new_w, new_h = w // 1, h // 1
@@ -137,14 +116,13 @@ class ImageProcessor:
 
                 # Find corresponding RGB values from pixel coordinates
                 depth_vals = []
-                depth_vals = [self.bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
+                depth_vals = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
 
                 # Find target
                 target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
 
                 # Convert to correct message type for publishing
-                mask_array = convert_to_MaskArray(
-                    centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_image_rgb, prediction_image_depth)
+                mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_reg_data)
                 
                 # Publish target values
                 self.target_pub.publish(target_pos)
@@ -178,16 +156,10 @@ class ImageProcessor:
 
             except (requests.exceptions.RequestException, IOError) as e:
                 rospy.logerr(f"Error: {e}")
-            
-            # -----------------------------------------------------------------------------
-
-            # Reset images after processing
-            self.rgb_image = None
-            self.depth_image = None
 
     def callback(self, reg_data):
         # Unpack registration data
-        self.rgb_image, self.depth_image, __, self.bigdepth_image, self.colour_depth_map = unpack_registration_data(reg_data)
+        self.reg_data = reg_data
 
     def cleanup(self):
         rospy.loginfo("Shutting down Image Processor Node")
