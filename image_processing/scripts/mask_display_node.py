@@ -52,6 +52,7 @@ class MaskDisplay:
             
             overlay = self.rgb_image.copy()
             alpha = 0.5  # Transparency factor
+            mask_colour = [0, 255, 0] # RGB values that determine mask colour
             
             mask_sum = np.zeros_like(self.rgb_image)
 
@@ -59,8 +60,8 @@ class MaskDisplay:
             for mask, logit in zip(self.masks, self.logits):
                 mask_scaled = np.zeros_like(self.rgb_image)
                 # Scale proportionally to confidence value
-                scaled_val = logit * 225
-                mask_scaled[mask] = [0, scaled_val, 0] # change these values to change colour
+                scaled_val = logit * mask_colour
+                mask_scaled[mask] = scaled_val
                 # Combine arrays
                 mask_sum = np.maximum(mask_sum, mask_scaled)
 

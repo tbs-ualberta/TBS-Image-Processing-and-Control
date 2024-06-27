@@ -178,7 +178,7 @@ class ImageSaver:
         except Exception as e:
             rospy.logerr(f"Error in callback_no_mask: {e}")
     
-    def callback_reg(self, reg_msg): # TODO this doesn't display correctly (probably has something to do with encoding)
+    def callback_reg(self, reg_msg):
         try:
             # Unpack the registration data
             reg_data = unpack_RegistrationData(reg_msg)

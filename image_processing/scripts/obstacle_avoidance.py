@@ -6,20 +6,20 @@
 
 import rospy
 from image_processing.msg import MaskArray
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import numpy as np
 import cv2
-from kinect_pub.srv import GetCameraInfo
-from scipy.ndimage import measurements
 from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb, is_mask_overlapping, calculate_centroids
 from sklearn.cluster import DBSCAN
 
 # ----------------------------------------------------- Constants -------------------------------------------------------
-EPS = 0.05 # for DBSCAN - maximum distance between two points for them to be considered as neighbors (in mm)
+EPS = 5 # for DBSCAN - maximum distance between two depth samples for them to be considered as neighbors (in mm) TODO validate that this is in mm
 
-MIN_SAMPLES = 10 # for DBSCAN - the minimum number of points required to form a mask
+MIN_SAMPLES = 10 # for DBSCAN - the minimum number of points required to form an obstacle mask
 
 OVERLAP_THRESHOLD = 0.5 # specifies how much of a mask must be contained in the floor mask to be filtered out
+
+FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to be for the floor mask to be saved
 # -----------------------------------------------------------------------------------------------------------------------
 
 class ObstacleAvoidance:
@@ -38,12 +38,10 @@ class ObstacleAvoidance:
         # Initialize node
         rospy.init_node('obstacle_avoidance', anonymous=True)
 
-        # Initialize mask data arrays
-        self.phrases = []
-        self.centroids = []
-        self.depth_vals = []
-        self.logits = []
-        self.floor_masks = [] # boolean array
+        # Initialize array to store array of floor masks
+        self.floor_masks = []   # 3D boolean array of floor masks
+
+        # Initialize images and maps
         self.rgb_image = None # RGB image accompanying mask data
         self.depth_image = None # Depth image accompanying mask data
         self.bigdepth_image = None # Maps depth onto RGB
@@ -62,9 +60,14 @@ class ObstacleAvoidance:
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
-        self.phrases, self.centroids, self.depth_vals, self.logits, self.floor_masks, reg_data = unpack_MaskArray(mask_data)
+        mask_phrases, centroids, depth_vals, potential_floor_logits, potential_floor_masks, reg_data = unpack_MaskArray(mask_data)
         self.rgb_image, self.depth_image, __, self.bigdepth_image, self.colour_depth_map = unpack_RegistrationData(reg_data)
 
+        # filter out all masks that are not labelled as "floor" and not above floor recognition threshold
+        for phrase, logit, potential_floor_mask in zip(mask_phrases, potential_floor_logits, potential_floor_masks):
+            if "floor" in phrase and logit >= FLOOR_RECOGNITION_THRESHOLD:
+                self.floor_masks.append(potential_floor_mask)
+                
         # Use masks to calculate average distance of each depth cluster
         self.find_obstacles()
 
@@ -102,33 +105,35 @@ class ObstacleAvoidance:
             cluster_masks[label][coords[labels == label, 0], coords[labels == label, 1]] = True
         
         self.obstacles = []
-        for mask in cluster_masks:
-            # Map mask to RGB space
-            rgb_mask = map_depth_mask_to_rgb(mask, self.rgb_image, self.depth_image, self.colour_depth_map)
+        for cluster_mask in cluster_masks:
+            # Obtain and save obstacle data
+
+            # Map cluster mask to RGB space
+            rgb_mask = map_depth_mask_to_rgb(cluster_mask, self.rgb_image, self.depth_image, self.colour_depth_map)
 
             # Filter out any masks that overlap with the floor region
             if not is_mask_overlapping(rgb_mask, self.floor_masks, OVERLAP_THRESHOLD):
 
-                obstacle = self.Obstacle()
+                temp_obstacle = self.Obstacle()
                 # save only cluster masks that are not overlapping
-                obstacle.mask_depth = mask
-                obstacle.mask_rgb = rgb_mask
+                temp_obstacle.mask_depth = cluster_mask
+                temp_obstacle.mask_rgb = rgb_mask
 
                 # Calculate average, min, and max depth for the current cluster
-                cluster_depth_values = depth_image[mask]
-                obstacle.avg_depth = np.mean(cluster_depth_values)
-                obstacle.min_depth = np.min(cluster_depth_values)
-                obstacle.max_depth = np.max(cluster_depth_values)
+                cluster_depth_values = depth_image[cluster_mask]
+                temp_obstacle.avg_depth = np.mean(cluster_depth_values)
+                temp_obstacle.min_depth = np.min(cluster_depth_values)
+                temp_obstacle.max_depth = np.max(cluster_depth_values)
 
                 # Calculate centroid for current cluster
-                obstacle.centroid = calculate_centroids(rgb_mask)
+                temp_obstacle.centroid = calculate_centroids(rgb_mask)
 
                 # Add new obstacle to global list of obstacles
-                self.obstacles.append(obstacle)
+                self.obstacles.append(temp_obstacle)
 
 
-    def display_obstacles(self):
-        # TODO check this
+    def display_obstacles(self): # TODO change this to work with the new Obstacle class
+        # TODO test this
         try:
             if self.rgb_image is None:
                 rospy.logwarn("rgb_image is None, skipping display")
@@ -136,32 +141,34 @@ class ObstacleAvoidance:
             
             overlay = self.rgb_image.copy()
             alpha = 0.5  # Transparency factor
+            mask_colour = [0, 255, 0] # RGB values that determine mask colour
             
             obstacle_mask_sum = np.zeros_like(self.rgb_image)
 
-            # Convert mask to single array. This allows for even application of colour and the image is not too darkened by multiple masks being overlaid.
-            for mask in self.obstacle_masks:
-                obstacle_mask_scaled = np.zeros_like(self.rgb_image)
-                obstacle_mask_scaled[mask] = [0, 255, 0] # change these values to change colour
+            # Convert obstacle masks to single array
+            for temp_obstacle in self.obstacles:
+                obstacle_mask_coloured = np.zeros_like(self.rgb_image)
+                obstacle_mask_coloured[temp_obstacle.mask_rgb] = mask_colour
                 # Combine arrays
-                obstacle_mask_sum = np.maximum(obstacle_mask_sum, obstacle_mask_scaled)
+                obstacle_mask_sum = np.maximum(obstacle_mask_sum, obstacle_mask_coloured)
 
             # Overlay mask on the image
             cv2.addWeighted(obstacle_mask_sum, alpha, overlay, 1 - alpha, 0, overlay)
 
             # Draw centroid and average depth
-            for centroid, avg_depth in zip(self.obstacle_centroids, self.obstacle_masks_avg_depth):
+            for temp_obstacle in self.obstacles:
+                temp_centroid = temp_obstacle.centroid
                 # Draw centroid
-                cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
+                cv2.circle(overlay, (temp_centroid[0], temp_centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
 
                 # Put text for average depth
-                cv2.putText(overlay, str(avg_depth), (centroid[0] + 10, centroid[1] - 10),
+                cv2.putText(overlay, str(temp_obstacle.avg_depth), (temp_centroid[0] + 10, temp_centroid[1] - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
             # Display image in window
             cv2.imshow("Obstacle Masks", overlay)
 
-            # Uncomment to check if mask is displaying properly - for testing
+            # Uncomment to display corresponding depth image
             # cv2.imshow("Depth Image", self.depth_image)
 
             cv2.waitKey(1)
