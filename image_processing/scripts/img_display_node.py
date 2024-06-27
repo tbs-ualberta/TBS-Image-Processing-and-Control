@@ -93,7 +93,7 @@ class ImageDisplay:
 
     def callback_rgb(self, rgb_msg):
         try:
-            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
+            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgra8")
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert rgb image: {e}")
         except Exception as e:
@@ -115,7 +115,7 @@ class ImageDisplay:
         except Exception as e:
             rospy.logerr(f"Error in callback_no_mask: {e}")
     
-    def callback_reg(self, reg_msg): # TODO this doesn't display correctly (probably has something to do with encoding)
+    def callback_reg(self, reg_msg):
         try:
             # Unpack the registration data
             reg_data = unpack_RegistrationData(reg_msg)

@@ -59,7 +59,8 @@ int main(int argc, char **argv)
     ros::Publisher depth_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/depth_norm", 1);
     ros::Publisher ir_raw_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_raw", 1);
     ros::Publisher ir_norm_pub = nh.advertise<sensor_msgs::Image>("/rgbd_out/ir_norm", 1);
-    ros::Publisher reg_pub = nh.advertise<kinect_pub::RegistrationData>("/rgbd_out/reg_data", 1); // For registration data
+    // For registration images and data
+    ros::Publisher reg_data_pub = nh.advertise<kinect_pub::RegistrationData>("/rgbd_out/reg_data", 1);
 
     // Initialize Kinect
     libfreenect2::Freenect2 freenect2;
@@ -160,8 +161,9 @@ int main(int argc, char **argv)
         // Process registered frame
         registration->apply(rgb, depth, &undistorted, &registered, true, &bigdepth, colour_depth_map);
 
-        // Convert to message types
-        sensor_msgs::ImagePtr reg_img_msg = frameToImageMsg(&registered, sensor_msgs::image_encodings::BGR8);
+        // Convert to reg data to message types
+        cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);
+        sensor_msgs::ImagePtr reg_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", reg_image).toImageMsg();
         sensor_msgs::ImagePtr big_depth_msg = frameToImageMsg(&bigdepth, sensor_msgs::image_encodings::TYPE_32FC1);
 
         kinect_pub::RegistrationData registration_data_msg;
@@ -178,7 +180,7 @@ int main(int argc, char **argv)
         }
         
         // Publish registration data
-        reg_pub.publish(registration_data_msg);
+        reg_data_pub.publish(registration_data_msg);
 
 
         listener.release(frames);
