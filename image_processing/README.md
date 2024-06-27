@@ -38,7 +38,9 @@ Note: changing the PROMPT constant will change what the image recognition model 
 "mask_display_node" receives the mask data and displays it using the OpenCV python package. It does this by overlaying each mask in green over the base RGB image. It then draws each centroid over those masks with accompanying text that describes the phrase (or object detected by the program) and the depth of the centroid (in meters). This program also publishes the final image to a ROS topic, which is read by the image saving program for image saving.
 
 # Obstacle Avoidance Program
-"obstacle_avoidance.py" receives the mask data and calculates a cost map based on objects around it using depth data from the depth sensor.
+"obstacle_avoidance.py" receives the mask data, along with the rgb image and depth data from the image processing program. It then uses the depth data to calculate clusters of similar value depth pixels, which are then labeled as obstacles. The program then calculates the depth (or distance from the camera) of each obstacle and uses these depths in a cost function to calculate the optimal path.
+
+Note: this program assumes that the image processing program's text prompt contains "floor" and that its target is NOT "floor.
 
 # Conclusion
 
@@ -46,4 +48,6 @@ A few notes about using this package:
 
 - Every program in this package relies on the output of the C++ program defined in the kinect_pub package, which reads in data from the Xbox Kinect V2 and publishes it to various ROS topics.
 - The image display, saving, and processing programs can be run once the above described C++ program is running, as they only rely on data published by that program.
-- The mask display program relies on data published by the processing program, so should only be run after the processing program has started.
+- The mask display and obstacle avoidance programs rely on data published by the processing program, so should only be run after the processing program has started.
+
+Note: for easiest operation, use the launch files provided in the "launch" directory. Some of these also have parameters which can be changed to change their behaviours. For more information see the launch files.
