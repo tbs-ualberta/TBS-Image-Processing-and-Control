@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
-# TODO adapt this for new registration
+
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # Directory to save images
@@ -25,12 +25,12 @@ SAVE_DEPTH = True
 SAVE_IR = False
 
 # Select whether to save registered images
-SAVE_REG = False
+SAVE_REG = True
 
 # Select whether to save masked images
 # Note: since the processing time is much slower than other images, and the images get published on a different frequency than the raw images,
 # this saves at the rate at which the processed images are published.
-SAVE_MASK = True
+SAVE_MASK = False
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -49,6 +49,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import os
 import shutil
 import imageio
+from kinect_pub.msg import RegistrationData
+from process_helper import unpack_RegistrationData
 
 class ImageSaver:
     def __init__(self):
@@ -56,18 +58,6 @@ class ImageSaver:
 
         # Initialize node
         rospy.init_node('img_display', anonymous=True)
-
-        # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', Image)
-        self.ir_sub = message_filters.Subscriber('/rgbd_out/ir_norm', Image)
-        self.reg_sub = message_filters.Subscriber('/rgbd_out/reg', Image)
-        self.mask_sub = message_filters.Subscriber('/process/mask_img', Image)
-
-        # Choose which topic to subscribe to, depending on whether normalization should be displayed
-        if SAVE_NORM:
-            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_norm', Image)
-        else:
-            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', Image)
 
         # Clear the save directory
         self.clear_directory(SAVE_PATH)
@@ -83,9 +73,16 @@ class ImageSaver:
         self.reg_image = None
         self.mask_image = None
 
-        # Synchronize the topics (excluding mask)
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub, self.ir_sub, self.reg_sub], 10, 1.0, allow_headerless=True)
-        self.ts.registerCallback(self.callback)
+        # Define individual subscribers for each topic individually
+        self.rgb_sub = rospy.Subscriber('/rgbd_out/rgb', Image, self.callback_rgb)
+        self.ir_sub = rospy.Subscriber('/rgbd_out/ir_norm', Image, self.callback_ir)
+        self.reg_sub = rospy.Subscriber('/rgbd_out/reg_data', RegistrationData, self.callback_reg)
+
+        # Choose which topic to subscribe to, depending on whether normalization should be displayed
+        if SAVE_NORM:
+            self.depth_sub = rospy.Subscriber('/rgbd_out/depth_norm', Image, self.callback_depth)
+        else:
+            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', Image, self.callback_depth)
 
         # Setup timer to call save function at specified rate
         self.save_timer = rospy.Timer(rospy.Duration(SAVE_INTERVAL), self.save_images)
@@ -157,18 +154,45 @@ class ImageSaver:
             self.save_count_mask += 1
             rospy.loginfo(f"Saved mask images at index" + str(self.save_count_mask).zfill(6))
 
-    def callback(self, rgb_msg, depth_msg, ir_msg, reg_msg):
+    def callback_rgb(self, rgb_msg):
         try:
-            # Convert the rgb and depth images to OpenCV format
             self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
-            self.ir_image = self.bridge.imgmsg_to_cv2(ir_msg, desired_encoding="32FC1")
-            self.reg_image = self.bridge.imgmsg_to_cv2(reg_msg, desired_encoding="bgr8")
-
         except CvBridgeError as e:
-            rospy.logerr(f"Failed to convert images: {e}")
+            rospy.logerr(f"Failed to convert rgb image: {e}")
         except Exception as e:
-            rospy.logerr(f"Error in callback: {e}")
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+
+    def callback_depth(self, depth_msg):
+        try:
+            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
+        except CvBridgeError as e:
+            rospy.logerr(f"Failed to convert depth image: {e}")
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+
+    def callback_ir(self, ir_msg):
+        try:
+            self.ir_image = self.bridge.imgmsg_to_cv2(ir_msg, desired_encoding="32FC1")
+        except CvBridgeError as e:
+            rospy.logerr(f"Failed to convert ir image: {e}")
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+    
+    def callback_reg(self, reg_msg): # TODO this doesn't display correctly (probably has something to do with encoding)
+        try:
+            # Unpack the registration data
+            reg_data = unpack_RegistrationData(reg_msg)
+
+            # Ensure the registration data is handled correctly
+            if len(reg_data) > 2:
+                __, __, self.reg_image, __, __ = reg_data
+            else:
+                rospy.logwarn("Registration data does not contain enough elements")
+                self.reg_image = None
+            
+            __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
 
     def spin(self):
         rospy.spin()
