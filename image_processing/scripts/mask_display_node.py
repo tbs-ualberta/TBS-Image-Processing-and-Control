@@ -8,7 +8,6 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from process_helper import unpack_MaskArray, unpack_RegistrationData
-from kinect_pub.msg import RegistrationData
 
 class MaskDisplay:
     def __init__(self):
@@ -30,7 +29,7 @@ class MaskDisplay:
         self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.mask_callback)
 
         # Define publisher to publish mask image
-        self.mask_img_pub = rospy.Publisher("process/mask_img", Image, queue_size=10)
+        self.mask_img_pub = rospy.Publisher('/process/mask_img', Image, queue_size=10)
 
         rospy.loginfo("Mask Display Node Started")
 

@@ -13,7 +13,7 @@ PROCESSING_RATE = 1 # in Hz
 TARGET_CONFIDENCE_THRESHOLD = 0.7
 
 # Select whether the output should be printed to the terminal or not
-PRINT_OUTPUT = False
+PRINT_OUTPUT = True
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -27,7 +27,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rospy
 from geometry_msgs.msg import Point
 from image_processing.msg import MaskArray
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import os
 import sys
 import time
@@ -35,7 +35,7 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from process_helper import calculate_centroids, find_target, convert_to_MaskArray, convert_to_RegistrationData, unpack_RegistrationData
+from process_helper import calculate_centroids, find_target, convert_to_MaskArray, unpack_RegistrationData
 import warnings
 from transformers import logging
 from kinect_pub.msg import RegistrationData

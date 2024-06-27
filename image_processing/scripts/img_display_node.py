@@ -16,7 +16,7 @@ DISPLAY_IR = False
 DISPLAY_NORM = True
 
 # Select whether to display registered image
-DISPLAY_REG = False
+DISPLAY_REG = True
 
 # Select whether to display images from the USB webcam
 DISPLAY_USB = False
@@ -35,9 +35,10 @@ DISPLAY_INTERVAL = 1.0 / DISPLAY_RATE
 
 import rospy
 from sensor_msgs.msg import Image
-import message_filters
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+from kinect_pub.msg import RegistrationData
+from process_helper import unpack_RegistrationData
 
 class ImageDisplay:
     def __init__(self):
@@ -46,16 +47,19 @@ class ImageDisplay:
         # Initialize node
         rospy.init_node('img_display', anonymous=True)
 
-        # Define subscribers for depth and rgb topics
-        self.rgb_sub = message_filters.Subscriber('/rgbd_out/rgb', Image)
-        self.ir_sub = message_filters.Subscriber('/rgbd_out/ir_norm', Image)
-        self.reg_sub = message_filters.Subscriber('/rgbd_out/reg', Image)
+        # Define individual subscribers for each topic individually
+        self.rgb_sub = rospy.Subscriber('/rgbd_out/rgb', Image, self.callback_rgb)
+        self.ir_sub = rospy.Subscriber('/rgbd_out/ir_norm', Image, self.callback_ir)
+        self.reg_sub = rospy.Subscriber('/rgbd_out/reg_data', RegistrationData, self.callback_reg)
 
         # Choose which topic to subscribe to, depending on whether normalization should be displayed
         if DISPLAY_NORM:
-            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_norm', Image)
+            self.depth_sub = rospy.Subscriber('/rgbd_out/depth_norm', Image, self.callback_depth)
         else:
-            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', Image)
+            self.depth_sub = rospy.Subscriber('/rgbd_out/depth_raw', Image, self.callback_depth)
+
+        # Subscriber to update usb image everytime one is received
+        self.usb_cam_sub = rospy.Subscriber('/usb_cam/image_raw', Image, self.callback_usb)
 
         # Initialize images
         self.rgb_image = None
@@ -64,46 +68,66 @@ class ImageDisplay:
         self.reg_image = None
         self.usb_image = None
 
-        # Subscriber to update usb image everytime one is received
-        self.usb_cam_sub = rospy.Subscriber('/usb_cam/image_raw', Image, self.callback_usb)
-
-        # Synchronize the topics
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub, self.ir_sub, self.reg_sub], 10, 1.0, allow_headerless=True)
-        self.ts.registerCallback(self.callback)
-
         # Timer to display all images
-        self.display_timer = rospy.Timer(rospy.Duration(DISPLAY_INTERVAL), self.display_kinect_images)
+        self.display_timer = rospy.Timer(rospy.Duration(DISPLAY_INTERVAL), self.display_rgbd_images)
 
         rospy.loginfo("Image Display Node Started")
 
-    def display_kinect_images(self, event):
+    def display_rgbd_images(self, event):
         try:
             # Display the images using OpenCV
             if DISPLAY_RGB and self.rgb_image is not None and self.rgb_image.size > 0:
-                cv2.imshow("Kinect RGB Image", self.rgb_image)
+                cv2.imshow("RGB Image", self.rgb_image)
             if DISPLAY_DEPTH and self.depth_image is not None and self.depth_image.size > 0:
-                cv2.imshow("Kinect Depth Image", self.depth_image)
+                cv2.imshow("Depth Image", self.depth_image)
             if DISPLAY_IR and self.ir_image is not None and self.ir_image.size > 0:
-                cv2.imshow("Kinect IR Image", self.ir_image)
+                cv2.imshow("IR Image", self.ir_image)
             if DISPLAY_REG and self.reg_image is not None and self.reg_image.size > 0:
-                cv2.imshow("Kinect Registered Image", self.reg_image)
+                cv2.imshow("Registered Image", self.reg_image)
             if self.usb_image is not None and self.usb_image.size > 0:
                 cv2.imshow("Webcam Image", self.usb_image)
             
             cv2.waitKey(1)
         except Exception as e:
             rospy.logerr(f"Error displaying images: {e}")
-        
-    def callback(self, rgb_msg, depth_msg, ir_msg, reg_msg):
-        try:
-            # Convert the rgb and depth images to OpenCV format
-            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
-            self.ir_image = self.bridge.imgmsg_to_cv2(ir_msg, desired_encoding="32FC1")
-            self.reg_image = self.bridge.imgmsg_to_cv2(reg_msg, desired_encoding="bgr8")
 
+    def callback_rgb(self, rgb_msg):
+        try:
+            self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
         except CvBridgeError as e:
-            rospy.logerr(f"Failed to convert images: {e}")
+            rospy.logerr(f"Failed to convert rgb image: {e}")
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+
+    def callback_depth(self, depth_msg):
+        try:
+            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
+        except CvBridgeError as e:
+            rospy.logerr(f"Failed to convert depth image: {e}")
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+
+    def callback_ir(self, ir_msg):
+        try:
+            self.ir_image = self.bridge.imgmsg_to_cv2(ir_msg, desired_encoding="32FC1")
+        except CvBridgeError as e:
+            rospy.logerr(f"Failed to convert ir image: {e}")
+        except Exception as e:
+            rospy.logerr(f"Error in callback_no_mask: {e}")
+    
+    def callback_reg(self, reg_msg): # TODO this doesn't display correctly (probably has something to do with encoding)
+        try:
+            # Unpack the registration data
+            reg_data = unpack_RegistrationData(reg_msg)
+
+            # Ensure the registration data is handled correctly
+            if len(reg_data) > 2:
+                __, __, self.reg_image, __, __ = reg_data
+            else:
+                rospy.logwarn("Registration data does not contain enough elements")
+                self.reg_image = None
+            
+            __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
         except Exception as e:
             rospy.logerr(f"Error in callback_no_mask: {e}")
 
