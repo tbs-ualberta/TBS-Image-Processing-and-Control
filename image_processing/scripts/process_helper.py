@@ -110,7 +110,7 @@ def unpack_RegistrationData(data):
 
     # Convert Registered Image
     try:
-        registered_image = bridge.imgmsg_to_cv2(data.registered_image, "bgr8")
+        registered_image = bridge.imgmsg_to_cv2(data.registered_image, "bgra8")
     except Exception as e:
         rospy.logerr("Error converting Registered image: %s", e)
 
