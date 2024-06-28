@@ -2,6 +2,12 @@
 // RUN BEFORE STARTING ROS PROGRAMS: source ~/catkin_ws/devel/setup.bash
 // THEN TO RUN NODE: rosrun kinect_pub kinect_pub_node
 
+// For info on the Kinect V2's FOV see: https://smeenk.com/kinect-field-of-view-comparison/
+// For info on the Kinect V2's Camera Parameters see: https://github.com/shanilfernando/VRInteraction/tree/master/calibration
+// Note: these will be slightly different on each camera. This program provides a ROS service for accessing the factory calibration
+// values stored on the camera, however image registration is also calculated in this program and published to a ROS topic,
+// enabling easy conversion between RGB pixel space and Cartesian space.
+
 #include <libfreenect2/libfreenect2.hpp>
 #include <libfreenect2/frame_listener_impl.h>
 #include <libfreenect2/packet_pipeline.h>
@@ -100,8 +106,12 @@ int main(int argc, char **argv)
     rgbParams = dev->getColorCameraParams();
 
     // Initialize service to send camera intrinsics
-    ros::ServiceServer service = nh.advertiseService("rgbd_out/get_camera_info", getCameraInfo);
+    ros::ServiceServer cam_info_serv = nh.advertiseService("rgbd_out/get_camera_info", getCameraInfo);
     ROS_INFO("Ready to provide camera info.");
+
+    // Initialize service to convert RGB points to cartesian space
+    ros::ServiceServer rgb_to_cartesian_serv = nh.advertiseService("rgbd_out/convert_from_rgb_to_cartesian", convert_rgb_to_cartesian);
+    ROS_INFO("Ready to convert RGB coordinates to Cartesian")
 
     // For registration; this only initializes the registration object, and does not do any processing
     libfreenect2::Registration* registration = new libfreenect2::Registration(irParams, rgbParams);

@@ -9,7 +9,7 @@ from scipy.ndimage import measurements, label
 import cv2
 from kinect_pub.msg import RegistrationData
 
-# --------------------------------------------- Conversion functions -------------------------------------------------
+# --------------------------------------------- Data Conversion functions -------------------------------------------------
 def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, reg_data_msg):
     bridge = CvBridge()
     mask_array = MaskArray()
@@ -162,9 +162,9 @@ def convert_to_matrices(camera_info):
 
     return rgb_intrinsics, depth_intrinsics, rgb_dist_coeffs, depth_dist_coeffs, extrinsic_matrix
 
-# --------------------------------------------- Conversion functions -------------------------------------------------
+# --------------------------------------------- Data Conversion functions -------------------------------------------------
 
-# ------------------------------------------------ Mask Processing ---------------------------------------------------
+# -------------------------------------------------- Mask Processing ------------------------------------------------------
 def split_mask(mask, min_connection_width=5):
     # Dilate the mask to remove narrow connections
     kernel = np.ones((min_connection_width, min_connection_width), np.uint8)
@@ -188,6 +188,37 @@ def split_mask(mask, min_connection_width=5):
     
     return separated_masks
 
+def is_mask_overlapping(mask, overlap_masks, OVERLAP_THRESHOLD):
+    '''
+    Calculates whether mask is overlaping any of overlap_masks by the overlap threshold
+    mask - mask that is being checked
+    overlap_masks - masks that mask cannot overlap
+    OVERLAP_THRESHOLD - percentage of mask that needs to overlap before it is considered "overlapping" (0.0-1.0)
+    '''
+    
+    for existing_mask in overlap_masks:
+        overlap = np.logical_and(mask, existing_mask).sum()
+        if overlap / mask.sum() >= OVERLAP_THRESHOLD:
+            return True
+    return False
+# -------------------------------------------------- Mask Processing ------------------------------------------------------
+
+# ----------------------------------------------- Centroid calculation ----------------------------------------------------
+def calculate_centroids(masks_np):
+    # Calculates each centroid in a list of masks
+    centroids = []
+    for m in masks_np:
+        centroid = measurements.center_of_mass(m)
+        centroids.append(centroid)
+
+    # convert y,x to x,y
+    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+
+    return centroids_as_pixels
+
+# ----------------------------------------------- Centroid calculation ----------------------------------------------------
+
+# -------------------------------------------- Coordinate Transformations -------------------------------------------------
 def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
     # Initialize mask to fill
     rgb_mask = np.zeros(rgb_image.shape, dtype=bool)
@@ -205,83 +236,13 @@ def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
 
     return rgb_mask
 
-def is_mask_overlapping(mask, overlap_masks, OVERLAP_THRESHOLD):
-    '''
-    Calculates whether mask is overlaping any of overlap_masks by the overlap threshold
-    mask - mask that is being checked
-    overlap_masks - masks that mask cannot overlap
-    OVERLAP_THRESHOLD - percentage of mask that needs to overlap before it is considered "overlapping" (0.0-1.0)
-    '''
+def map_rgb_point_to_cartesian(rgb_point, bigdepth):
     
-    for existing_mask in overlap_masks:
-        overlap = np.logical_and(mask, existing_mask).sum()
-        if overlap / mask.sum() >= OVERLAP_THRESHOLD:
-            return True
-    return False
-# ------------------------------------------------ Mask Processing ---------------------------------------------------
 
-# -------------------------------------------- Centroid calculation --------------------------------------------------
-def calculate_centroids(masks_np):
-    # Calculates each centroid in a list of masks
-    centroids = []
-    for m in masks_np:
-        centroid = measurements.center_of_mass(m)
-        centroids.append(centroid)
 
-    # convert y,x to x,y
-    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+# -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
-    return centroids_as_pixels
-
-# -------------------------------------------- Centroid calculation --------------------------------------------------
-
-# ---------------------------------------------- Depth calculation ---------------------------------------------------
-def calculate_average_depths_from_rgb_mask(masks, depth_image, RGB_INTRINSICS, DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, EXTRINSIC_MATRIX):
-    # Calculate the average depth in each mask
-    average_depths = []
-    for mask in masks:
-        # Get the coordinates of the unmasked pixels
-        unmasked_coords = np.argwhere(mask)
-        if len(unmasked_coords) == 0:
-            average_depths.append(None)
-            continue
-        
-        # Normalize the RGB pixel coordinates
-        normalized_rgb_points = np.linalg.inv(RGB_INTRINSICS).dot(
-            np.vstack((unmasked_coords[:, 1], unmasked_coords[:, 0], np.ones(unmasked_coords.shape[0])))
-        )
-
-        # Transform the normalized points to the depth camera coordinate system
-        points_3d_rgb = np.vstack((normalized_rgb_points[0], normalized_rgb_points[1], np.ones(normalized_rgb_points.shape[1]), np.ones(normalized_rgb_points.shape[1])))
-        points_3d_depth = np.linalg.inv(EXTRINSIC_MATRIX).dot(points_3d_rgb)
-        points_3d_depth /= points_3d_depth[3]  # Normalize homogeneous coordinates
-
-        # Project the 3D points to the 2D depth image plane
-        x_d = (points_3d_depth[0] * DEPTH_INTRINSICS[0, 0] / points_3d_depth[2]) + DEPTH_INTRINSICS[0, 2]
-        y_d = (points_3d_depth[1] * DEPTH_INTRINSICS[1, 1] / points_3d_depth[2]) + DEPTH_INTRINSICS[1, 2]
-
-        # Undistort the depth points
-        depth_points = np.vstack((x_d, y_d)).T
-        undistorted_depth_points = cv2.undistortPoints(np.array([depth_points], dtype=np.float32), DEPTH_INTRINSICS, DEPTH_DIST_COEFFS, P=DEPTH_INTRINSICS)
-        undistorted_depth_points = undistorted_depth_points[0]
-
-        # Retrieve the depth values
-        depth_values = []
-        for x, y in undistorted_depth_points:
-            if 0 <= int(x) < depth_image.shape[1] and 0 <= int(y) < depth_image.shape[0]:
-                depth_values.append(depth_image[int(y), int(x)])
-        
-        # Calculate the average depth
-        if depth_values:
-            average_depth = np.mean(depth_values)
-            average_depths.append(average_depth)
-        else:
-            average_depths.append(None)
-
-    return average_depths
-# ---------------------------------------------- Depth calculation ---------------------------------------------------
-
-# ------------------------------------------------ Target finding ----------------------------------------------------
+# -------------------------------------------------- Target finding -------------------------------------------------------
 def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, depth_vals, logits):
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
@@ -298,4 +259,4 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
             min_depth = temp_depth
     target = Point(target_x, target_y, target_depth) # Note: z in value is in mm, while x and y are in px
     return target
-# ------------------------------------------------ Target finding ----------------------------------------------------
+# -------------------------------------------------- Target finding -------------------------------------------------------

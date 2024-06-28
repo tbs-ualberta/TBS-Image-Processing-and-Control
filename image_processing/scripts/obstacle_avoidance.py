@@ -11,6 +11,8 @@ import numpy as np
 import cv2
 from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb, is_mask_overlapping, calculate_centroids
 from sklearn.cluster import DBSCAN
+from geometry_msgs.msg import Point, Twist
+import message_filters
 
 # ----------------------------------------------------- Constants -------------------------------------------------------
 EPS = 5 # for DBSCAN - maximum distance between two depth samples for them to be considered as neighbors (in mm) TODO validate that this is in mm
@@ -31,6 +33,7 @@ class ObstacleAvoidance:
             self.min_depth = None   # minimum depth of the obstacle
             self.max_depth = None   # maximum depth of the obstacle
             self.centroid = []      # location of the centroid of the obstacle in RGB space (x,y)
+            self.closest_point = [] # location of the closest point to the robot in RGB space (x,y)
 
     def __init__(self):
         self.bridge = CvBridge()
@@ -49,14 +52,20 @@ class ObstacleAvoidance:
 
         self.obstacles = [] # stores a list of Obstacle objects
         
-        # Define subscriber for mask data
-        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.mask_callback)
+        # Define subscribers for mask and target data
+        self.mask_sub = message_filters.Subscriber('/process/mask_data', MaskArray)
+        self.target_sub = message_filters.Subscriber('/process/target', Point)
 
-        # Define publishers
+        # Synchronize the topics (excluding mask)
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.mask_sub, self.target_sub], 10, 1.0, allow_headerless=True)
+        self.ts.registerCallback(self.calculate_path)
+
+        # Define velocity publisher
+        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
 
         rospy.loginfo("Obstacle avoidance node started")
 
-    def mask_callback(self, mask_data):
+    def calculate_path(self, mask_data, target_location):
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
@@ -74,7 +83,11 @@ class ObstacleAvoidance:
         # Display obstacle image (for testing)
         self.display_obstacles()
 
+        # Convert the 3D data to a top-down view
+        self.convert_to_top_down()
+        
         # Use that information to calculate cost function
+
         # TODO build a map of the environment and use potential field path planning to find a path
         
     def find_obstacles(self):
@@ -128,11 +141,25 @@ class ObstacleAvoidance:
                 # Calculate centroid for current cluster
                 temp_obstacle.centroid = calculate_centroids(rgb_mask)
 
+                # Calculate location of minimum value in array
+                temp_obstacle.closest_point = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
+
                 # Add new obstacle to global list of obstacles
                 self.obstacles.append(temp_obstacle)
 
+    def convert_to_top_down(self):
+        # Convert the obstacle (and target) locations to 2D top-down view
 
-    def display_obstacles(self): # TODO change this to work with the new Obstacle class
+        # Convert from px to mm
+
+        # Discard height information
+
+        # Calculate top down X and Y coords (assume positive x-axis goes from center of camera straight out in front of the robot, 
+        # with origin at camera sensor
+        
+
+
+    def display_obstacles(self):
         # TODO test this
         try:
             if self.rgb_image is None:

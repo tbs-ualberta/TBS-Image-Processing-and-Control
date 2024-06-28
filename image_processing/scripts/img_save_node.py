@@ -82,7 +82,7 @@ class ImageSaver:
         if SAVE_NORM:
             self.depth_sub = rospy.Subscriber('/rgbd_out/depth_norm', Image, self.callback_depth)
         else:
-            self.depth_sub = message_filters.Subscriber('/rgbd_out/depth_raw', Image, self.callback_depth)
+            self.depth_sub = rospy.Subscriber('/rgbd_out/depth_raw', Image, self.callback_depth)
 
         # Setup timer to call save function at specified rate
         self.save_timer = rospy.Timer(rospy.Duration(SAVE_INTERVAL), self.save_images)
