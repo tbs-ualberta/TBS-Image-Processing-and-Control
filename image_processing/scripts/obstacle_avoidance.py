@@ -9,7 +9,7 @@ from image_processing.msg import MaskArray
 from cv_bridge import CvBridge
 import numpy as np
 import cv2
-from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb, is_mask_overlapping, calculate_centroids
+from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb, is_mask_overlapping, calculate_centroids, get_camera_parameters
 from sklearn.cluster import DBSCAN
 from geometry_msgs.msg import Point, Twist
 import message_filters
@@ -40,6 +40,13 @@ class ObstacleAvoidance:
 
         # Initialize node
         rospy.init_node('obstacle_avoidance', anonymous=True)
+
+        # Get camera parameters and store them in dictionaries
+        self.depth_params, self.rgb_params = get_camera_parameters()
+        if self.depth_params is None or self.rgb_params is None:
+            rospy.logerr("Unable to get camera parameters.")
+        else:
+            rospy.loginfo("Fetched camera parameters successfully.")
 
         # Initialize array to store array of floor masks
         self.floor_masks = []   # 3D boolean array of floor masks

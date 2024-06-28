@@ -8,6 +8,7 @@ import numpy as np
 from scipy.ndimage import measurements, label
 import cv2
 from kinect_pub.msg import RegistrationData
+from kinect_pub.srv import GetCameraInfo
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
 def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, reg_data_msg):
@@ -95,6 +96,33 @@ def convert_to_RegistrationData(rgb_image, depth_image, undistorted_image, regis
         rospy.logerr(f"Error converting images to ROS messages: {e}")
 
     return reg_data_msg
+
+def get_camera_parameters():
+    rospy.wait_for_service('/rgbd_out/get_camera_info')
+    try:
+        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
+        response = get_camera_info()
+        
+        # Construct the dictionary with depth camera parameters
+        depth_params = {
+            'cx': response.ir_cx,
+            'cy': response.ir_cy,
+            'fx': response.ir_fx,
+            'fy': response.ir_fy
+        }
+        
+        # Optional: Also get RGB camera parameters if needed
+        rgb_params = {
+            'cx': response.rgb_cx,
+            'cy': response.rgb_cy,
+            'fx': response.rgb_fx,
+            'fy': response.rgb_fy
+        }
+        
+        return depth_params, rgb_params
+    except rospy.ServiceException as e:
+        rospy.logerr("Service call failed: %s" % e)
+        return None, None
 
 def unpack_RegistrationData(data):
     # Unpacks registration data from custom message structure
@@ -246,6 +274,43 @@ def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
 
     return rgb_mask
 
+def get_point_xyz(undistorted, r, c, depth_params):
+    """
+    Maps a pixel (r, c) to Cartesian coordinates (x, y, z) using the undistorted depth image.
+
+    Parameters:
+    - undistorted: The undistorted depth image as a 2D numpy array.
+    - r, c: The row and column of the pixel.
+    - depth_params: A dictionary containing the depth camera's intrinsic parameters:
+        {
+            'cx': cx,
+            'cy': cy,
+            'fx': fx,
+            'fy': fy
+        }
+
+    Returns:
+    - A tuple (x, y, z) representing the Cartesian coordinates.
+
+    This function is a conversion of the getPointXYZ C++ function in the libfreenect2 package
+    """
+    bad_point = np.nan
+    cx = depth_params['cx']
+    cy = depth_params['cy']
+    fx = 1 / depth_params['fx']
+    fy = 1 / depth_params['fy']
+
+    depth_val = undistorted[r, c] / 1000.0  # scaling factor to convert to meters
+
+    if np.isnan(depth_val) or depth_val <= 0.001:
+        # depth value is not valid
+        x = y = z = bad_point
+    else:
+        x = (c + 0.5 - cx) * fx * depth_val
+        y = (r + 0.5 - cy) * fy * depth_val
+        z = depth_val
+
+    return x, y, z
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
 # -------------------------------------------------- Target finding -------------------------------------------------------

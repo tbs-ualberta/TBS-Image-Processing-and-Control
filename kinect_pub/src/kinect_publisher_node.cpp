@@ -106,12 +106,8 @@ int main(int argc, char **argv)
     rgbParams = dev->getColorCameraParams();
 
     // Initialize service to send camera intrinsics
-    ros::ServiceServer cam_info_serv = nh.advertiseService("rgbd_out/get_camera_info", getCameraInfo);
+    ros::ServiceServer cam_info_serv = nh.advertiseService("/rgbd_out/get_camera_info", getCameraInfo);
     ROS_INFO("Ready to provide camera info.");
-
-    // Initialize service to convert RGB points to cartesian space
-    ros::ServiceServer rgb_to_cartesian_serv = nh.advertiseService("rgbd_out/convert_from_rgb_to_cartesian", convert_rgb_to_cartesian);
-    ROS_INFO("Ready to convert RGB coordinates to Cartesian")
 
     // For registration; this only initializes the registration object, and does not do any processing
     libfreenect2::Registration* registration = new libfreenect2::Registration(irParams, rgbParams);
