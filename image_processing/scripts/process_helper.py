@@ -274,7 +274,7 @@ def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
 
     return rgb_mask
 
-def get_point_xyz(undistorted, r, c, depth_params):
+def get_point_xyz(undistorted, point, depth_params):
     """
     Maps a pixel (r, c) to Cartesian coordinates (x, y, z) using the undistorted depth image.
 
@@ -293,7 +293,10 @@ def get_point_xyz(undistorted, r, c, depth_params):
     - A tuple (x, y, z) representing the Cartesian coordinates.
 
     This function is a conversion of the getPointXYZ C++ function in the libfreenect2 package
+    See here: https://github.com/OpenKinect/libfreenect2/blob/fd64c5d9b214df6f6a55b4419357e51083f15d93/src/registration.cpp#L342
     """
+    r = point[0]
+    c = point[1]
     bad_point = np.nan
     cx = depth_params['cx']
     cy = depth_params['cy']
@@ -310,6 +313,10 @@ def get_point_xyz(undistorted, r, c, depth_params):
         y = (r + 0.5 - cy) * fy * depth_val
         z = depth_val
 
+    # Convert to mm
+    x = x / 1000
+    y = y / 1000
+    z = z / 1000
     return x, y, z
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 

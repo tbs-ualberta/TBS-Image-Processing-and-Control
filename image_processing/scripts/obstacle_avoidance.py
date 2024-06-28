@@ -9,7 +9,9 @@ from image_processing.msg import MaskArray
 from cv_bridge import CvBridge
 import numpy as np
 import cv2
-from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb, is_mask_overlapping, calculate_centroids, get_camera_parameters
+import math
+from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb
+from process_helper import is_mask_overlapping, calculate_centroids, get_camera_parameters, get_point_xyz
 from sklearn.cluster import DBSCAN
 from geometry_msgs.msg import Point, Twist
 import message_filters
@@ -27,13 +29,20 @@ FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to b
 class ObstacleAvoidance:
     class Obstacle:
         def __init__(self):
-            self.mask_depth = None  # boolean mask of the obstacle in depth space
-            self.mask_rgb = None    # boolean mask of the obstacle in RGB space
-            self.avg_depth = None   # average depth of the obstacle
-            self.min_depth = None   # minimum depth of the obstacle
-            self.max_depth = None   # maximum depth of the obstacle
-            self.centroid = []      # location of the centroid of the obstacle in RGB space (x,y)
-            self.closest_point = [] # location of the closest point to the robot in RGB space (x,y)
+            self.mask_depth = None              # boolean mask of the obstacle in depth space
+            self.mask_rgb = None                # boolean mask of the obstacle in pixel space
+            self.avg_depth = None               # average depth of the obstacle
+            self.min_depth = None               # minimum depth of the obstacle
+            self.max_depth = None               # maximum depth of the obstacle
+            self.centroid_px = []               # location of the centroid of the obstacle in pixel space (x,y in px)
+            self.centroid_cartesian = []        # location of the centroid in Cartesian space (x,y,z in mm)
+            self.closest_point_px = []          # location of the closest point to the robot in pixel space (x,y in px)
+            self.closest_point_cartesian = []   # location of the closest point in Cartesian space (x,y,z in mm)
+
+    class Obstacle_2D:
+        def __init__(self):
+            self.closest_point = None   # coordinate of closest point from a top down view
+            self.dist = None            # distance from the camera to the obstacle in the horizontal plane
 
     def __init__(self):
         self.bridge = CvBridge()
@@ -52,13 +61,14 @@ class ObstacleAvoidance:
         self.floor_masks = []   # 3D boolean array of floor masks
 
         # Initialize images and maps
-        self.rgb_image = None # RGB image accompanying mask data
-        self.depth_image = None # Depth image accompanying mask data
-        self.undistorted_image = None # Undistorted Depth image
-        self.bigdepth_image = None # Maps depth onto RGB
-        self.colour_depth_map = None # Maps RGB onto depth
+        self.rgb_image = None           # RGB image accompanying mask data
+        self.depth_image = None         # Depth image accompanying mask data
+        self.undistorted_image = None   # Undistorted Depth image
+        self.bigdepth_image = None      # Maps depth onto RGB
+        self.colour_depth_map = None    # Maps RGB onto depth
 
-        self.obstacles = [] # stores a list of Obstacle objects
+        self.obstacles = []     # stores a list of Obstacle objects
+        self.obstacles_2d = []  # stores a list of 2d obstacles
         
         # Define subscribers for mask and target data
         self.mask_sub = message_filters.Subscriber('/process/mask_data', MaskArray)
@@ -147,25 +157,57 @@ class ObstacleAvoidance:
                 temp_obstacle.max_depth = np.max(cluster_depth_values)
 
                 # Calculate centroid for current cluster
-                temp_obstacle.centroid = calculate_centroids(rgb_mask)
+                temp_obstacle.centroid_px = calculate_centroids(rgb_mask)
+
+                # Convert centroid location to Cartesian space
+                temp_obstacle.centroid_cartesian = get_point_xyz(self.undistorted_image, temp_obstacle.centroid_px, self.depth_params)
 
                 # Calculate location of minimum value in array
-                temp_obstacle.closest_point = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
+                temp_obstacle.closest_point_px = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
+
+                # Convert closest point location to Cartesian space
+                temp_obstacle.closest_point_cartesian = get_point_xyz(self.undistorted_image, temp_obstacle.closest_point_px, self.depth_params)
 
                 # Add new obstacle to global list of obstacles
                 self.obstacles.append(temp_obstacle)
 
     def convert_to_top_down(self):
-        # Convert the obstacle (and target) locations to 2D top-down view
+        # Convert the obstacles (and target) locations to 2D top-down view
 
-        # Convert from px to mm
+        '''
+        The following ASCII art depict the top down view of the robot and the location of the axes when calculating the cartesian
+        coordinates of obstacles. Note that the origin is located at the front of the robot (where the depth sensor is placed).
 
-        # Discard height information
+        Top down view of Robot
+             y-axis
+                  |  /
+         _________| /
+        |         |/
+        |   WMM   |--------------- x-axis
+        |_________|\ <- 35.6deg
+                    \
+                     \
 
-        # Calculate top down X and Y coords (assume positive x-axis goes from center of camera straight out in front of the robot, 
-        # with origin at camera sensor
-        
+        '''
+        # Calculate top down X and Y coords (assume positive x-axis goes from center of camera straight out in front
+        # of the robot, with origin at camera sensor.
+        # Note: the horizontal plane will be perpendicular to the sensor, not necessarily parallel with the floor.
+        for temp_obstacle in self.obstacles:
+            point_3d = temp_obstacle.closest_point_cartesian
 
+            # Get x and y coordinates
+            x = -1 * point_3d[2] # -1*z
+            y = point_3d[0]      # x
+
+            # Calculate hypotenuse (or distance to object in horizontal plane)
+            h = math.sqrt(x * x + y * y)
+
+            temp_2d_obstacle = self.Obstacle_2D()
+            temp_2d_obstacle.closest_point = [x, y]
+            temp_2d_obstacle.dist = h
+            self.obstacles_2d.append(temp_2d_obstacle)
+
+        # TODO do this for target as well
 
     def display_obstacles(self):
         # TODO test this
@@ -192,7 +234,7 @@ class ObstacleAvoidance:
 
             # Draw centroid and average depth
             for temp_obstacle in self.obstacles:
-                temp_centroid = temp_obstacle.centroid
+                temp_centroid = temp_obstacle.centroid_px
                 # Draw centroid
                 cv2.circle(overlay, (temp_centroid[0], temp_centroid[1]), 5, (0, 0, 255), -1)  # Red color for centroid
 
