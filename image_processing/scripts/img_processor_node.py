@@ -87,7 +87,7 @@ class ImageProcessor:
         try:
             prediction_reg_data = self.reg_data
             # Unpack data from message data type
-            rgb_image, depth_image, __, prediction_bigdepth_image, __ = unpack_RegistrationData(prediction_reg_data)
+            rgb_image, depth_image, __, __, prediction_bigdepth_image, __ = unpack_RegistrationData(prediction_reg_data)
 
             # For publishing mask and centroid data
             mask_array = MaskArray() 

@@ -62,7 +62,7 @@ def unpack_MaskArray(mask_data):
     except Exception as e:
         rospy.logerr(f"Error processing mask data: {e}")
 
-def convert_to_RegistrationData(rgb_image, depth_image, registered_image, bigdepth_image, colour_depth_map):
+def convert_to_RegistrationData(rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map):
     bridge = CvBridge()
     reg_data_msg = RegistrationData()
 
@@ -74,6 +74,10 @@ def convert_to_RegistrationData(rgb_image, depth_image, registered_image, bigdep
         # Convert depth image to ROS Image message
         depth_msg = bridge.cv2_to_imgmsg(depth_image, encoding="32FC1")
         reg_data_msg.depth_image = depth_msg
+
+        # Convert undistorted depth image to ROS Image message
+        undistorted_msg = bridge.cv2_to_imgmsg(undistorted_image, encoding="32FC1")
+        reg_data_msg.undistorted_image = undistorted_msg
 
         # Convert registered image to ROS Image message
         registered_msg = bridge.cv2_to_imgmsg(registered_image, encoding="bgr8")
@@ -108,6 +112,12 @@ def unpack_RegistrationData(data):
     except Exception as e:
         rospy.logerr("Error converting Depth image: %s", e)
 
+    # Convert Undistorted Image
+    try:
+        undistorted_image = bridge.imgmsg_to_cv2(data.undistorted_image, "32FC1")
+    except Exception as e:
+        rospy.logerr("Error converting Undistorted image: %s", e)
+
     # Convert Registered Image
     try:
         registered_image = bridge.imgmsg_to_cv2(data.registered_image, "bgra8")
@@ -127,7 +137,7 @@ def unpack_RegistrationData(data):
     except Exception as e:
         rospy.logerr("Error converting Color Depth Map: %s", e)
 
-    return rgb_image, depth_image, registered_image, bigdepth_image, colour_depth_map
+    return rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map
 
 def convert_to_matrices(camera_info):
     # Initialize intrinsic matrices
@@ -235,10 +245,6 @@ def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
             rgb_mask[color_y, color_x] = True  # Mark the corresponding position in the RGB mask
 
     return rgb_mask
-
-def map_rgb_point_to_cartesian(rgb_point, bigdepth):
-    
-
 
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 

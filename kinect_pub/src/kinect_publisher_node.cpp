@@ -174,12 +174,17 @@ int main(int argc, char **argv)
         // Convert to reg data to message types
         cv::Mat reg_image(registered.height, registered.width, CV_8UC4, registered.data);
         sensor_msgs::ImagePtr reg_img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", reg_image).toImageMsg();
+
+        cv::Mat undistorted_image(undistorted.height, undistorted.width, CV_32FC1, undistorted.data);
+        sensor_msgs::ImagePtr undistorted_msg = cv_bridge::CvImage(std_msgs::Header(), "32FC1", undistorted_image).toImageMsg();
         sensor_msgs::ImagePtr big_depth_msg = frameToImageMsg(&bigdepth, sensor_msgs::image_encodings::TYPE_32FC1);
+        
 
         kinect_pub::RegistrationData registration_data_msg;
 
         registration_data_msg.rgb_image = *rgb_msg; // RGB image
         registration_data_msg.depth_image = *depth_raw_msg; // Depth image
+        registration_data_msg.undistorted_image = *undistorted_msg; // Undistorted depth image
         registration_data_msg.registered_image = *reg_img_msg; // RGB image mapped to depth image
         registration_data_msg.bigdepth_image = *big_depth_msg; // Maps depth onto RGB
 

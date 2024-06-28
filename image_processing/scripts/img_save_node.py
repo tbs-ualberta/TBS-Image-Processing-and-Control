@@ -190,7 +190,7 @@ class ImageSaver:
                 rospy.logwarn("Registration data does not contain enough elements")
                 self.reg_image = None
             
-            __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
+            __, __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
         except Exception as e:
             rospy.logerr(f"Error in callback_no_mask: {e}")
 
