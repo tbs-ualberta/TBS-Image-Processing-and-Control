@@ -23,7 +23,7 @@ EPS = 10 # for DBSCAN - maximum distance between two depth samples for them to b
 
 MIN_SAMPLES = 30 # for DBSCAN - the minimum number of points required to form an obstacle mask
 
-OVERLAP_THRESHOLD = 0.2 # specifies how much of a mask must be contained in the floor mask to be filtered out
+OVERLAP_THRESHOLD = 0.1 # specifies how much of a mask must be contained in the floor mask to be filtered out
 
 FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to be for the floor mask to be used
 # -----------------------------------------------------------------------------------------------------------------------
@@ -31,14 +31,13 @@ FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to b
 class ObstacleAvoidance:
     class Obstacle:
         def __init__(self):
-            self.mask_depth = None              # boolean mask of the obstacle in depth space
-            self.mask_rgb = None                # boolean mask of the obstacle in pixel space
+            self.mask_depth = None              # boolean mask of the obstacle in depth pixel space
             self.avg_depth = None               # average depth of the obstacle
             self.min_depth = None               # minimum depth of the obstacle
             self.max_depth = None               # maximum depth of the obstacle
-            self.centroid_px = []               # location of the centroid of the obstacle in pixel space (x,y in px)
+            self.centroid_px = []               # location of the centroid of the obstacle in depth pixel space (x,y in px)
             self.centroid_cartesian = []        # location of the centroid in Cartesian space (x,y,z in mm)
-            self.closest_point_px = []          # location of the closest point to the robot in pixel space (x,y in px)
+            self.closest_point_px = []          # location of the closest point to the robot in depth pixel space (x,y in px)
             self.closest_point_cartesian = []   # location of the closest point in Cartesian space (x,y,z in mm)
 
     class Obstacle_2D:
@@ -60,7 +59,7 @@ class ObstacleAvoidance:
             rospy.loginfo("Fetched camera parameters successfully.")
 
         # Initialize array to store array of floor masks
-        self.floor_masks = []   # 3D boolean array of floor masks
+        self.floor_masks = []   # 3D boolean array of floor masks (in depth pixel space)
 
         # Initialize images and maps
         self.rgb_image = None           # RGB image accompanying mask data
@@ -103,12 +102,25 @@ class ObstacleAvoidance:
         # filter out all masks that are not labelled as "floor" and not above floor recognition threshold
         for phrase, logit, potential_floor_mask in zip(mask_phrases, potential_floor_logits, potential_floor_masks):
             if "floor" in phrase and logit >= FLOOR_RECOGNITION_THRESHOLD:
-                self.floor_masks.append(potential_floor_mask)
+                # Convert mask to uint8 type
+                int_mask = potential_floor_mask.astype(np.uint8) * 255  # Convert True/False to 255/0
+                # Resize floor mask to fit depth image
+                int_mask_resized = cv2.resize(int_mask, (self.depth_image.shape[1], self.depth_image.shape[0]))
+                # Convert mask back to boolean type
+                bool_mask_resized = (int_mask_resized != 0)
+                self.floor_masks.append(bool_mask_resized)
 
             # TODO save target information
                 
         # Use masks to calculate average distance of each depth cluster
         self.find_obstacles()
+
+        # For testing
+        obstacle_masks = []
+        for temp_obs in self.obstacles:
+            obstacle_masks.append(temp_obs.mask_depth)
+            
+        display_depth_with_masks(self.depth_image, obstacle_masks)
 
         # Convert the 3D data to a top-down view
         # self.convert_to_top_down()
@@ -118,7 +130,7 @@ class ObstacleAvoidance:
         # TODO build a map of the environment and use potential field path planning to find a path
 
         # Display obstacle image (for testing)
-        self.display_obstacles()
+        # self.display_obstacles()
         
     def find_obstacles(self):
         # Finds similar value depth pixels and groups them together, then outputs the average depth of those pixels.
@@ -178,26 +190,16 @@ class ObstacleAvoidance:
                 temp_mask[int(x), int(y)] = True
 
             cluster_masks.append(temp_mask)
-
-        # For testing
-        display_depth_with_masks(depth_image, cluster_masks)
         
         # Obtain and save obstacle data
         for cluster_mask in cluster_masks: # TODO fix this
 
-            # Map cluster mask to RGB space
-            rgb_mask = map_depth_mask_to_rgb(cluster_mask, rgb_image, depth_image, colour_depth_map)
-
-            # print(colour_depth_map)
-            print("Number of true values in RGB mask: " + str((rgb_mask == True).sum()))
-
             # Filter out any masks that overlap with the floor region
-            if not is_mask_overlapping(rgb_mask, floor_masks, OVERLAP_THRESHOLD):
-
+            if not is_mask_overlapping(cluster_mask, floor_masks, OVERLAP_THRESHOLD):
                 temp_obstacle = self.Obstacle()
-                # save only cluster masks that are not overlapping
+
+                # Save only cluster masks that are not overlapping
                 temp_obstacle.mask_depth = cluster_mask
-                temp_obstacle.mask_rgb = rgb_mask
 
                 # Calculate average, min, and max depth for the current cluster
                 cluster_depth_values = depth_image[cluster_mask]
@@ -206,16 +208,16 @@ class ObstacleAvoidance:
                 temp_obstacle.max_depth = np.max(cluster_depth_values)
 
                 # Calculate centroid for current cluster
-                temp_obstacle.centroid_px = calculate_centroids(rgb_mask)
+                # temp_obstacle.centroid_px = calculate_centroids(cluster_mask)
 
                 # Convert centroid location to Cartesian space
-                temp_obstacle.centroid_cartesian = get_point_xyz(undistorted_image, temp_obstacle.centroid_px, self.depth_params)
+                # temp_obstacle.centroid_cartesian = get_point_xyz(undistorted_image, temp_obstacle.centroid_px, self.depth_params)
 
                 # Calculate location of minimum value in array
-                temp_obstacle.closest_point_px = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
+                # temp_obstacle.closest_point_px = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
 
                 # Convert closest point location to Cartesian space
-                temp_obstacle.closest_point_cartesian = get_point_xyz(undistorted_image, temp_obstacle.closest_point_px, self.depth_params)
+                # temp_obstacle.closest_point_cartesian = get_point_xyz(undistorted_image, temp_obstacle.closest_point_px, self.depth_params)
 
                 # Add new obstacle to global list of obstacles
                 self.obstacles.append(temp_obstacle)
@@ -259,8 +261,9 @@ class ObstacleAvoidance:
             self.obstacles_2d.append(temp_2d_obstacle)
 
         # TODO do this for target as well
+        
 
-    def display_obstacles(self):
+    def display_obstacles_with_data(self):
         # TODO test this
         try:
             if self.rgb_image is None:
