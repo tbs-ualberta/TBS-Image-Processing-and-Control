@@ -2,7 +2,7 @@
 # Authored by: Andor Siegers
 
 # Assumes that the object_detection program is detecting "floor" as it's prompt
-# Integrating the target into this program is doable, but the target would have to be detected and mapped as the goal instead of an obstacle.
+# Integrating the target into this program is doable, but the target would have to be detected and mapped as the goal instead of as an obstacle.
 
 import rospy
 from image_processing.msg import MaskArray
@@ -23,7 +23,7 @@ MIN_SAMPLES = 10 # for DBSCAN - the minimum number of points required to form an
 
 OVERLAP_THRESHOLD = 0.5 # specifies how much of a mask must be contained in the floor mask to be filtered out
 
-FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to be for the floor mask to be saved
+FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to be for the floor mask to be used
 # -----------------------------------------------------------------------------------------------------------------------
 
 class ObstacleAvoidance:
@@ -94,12 +94,11 @@ class ObstacleAvoidance:
         for phrase, logit, potential_floor_mask in zip(mask_phrases, potential_floor_logits, potential_floor_masks):
             if "floor" in phrase and logit >= FLOOR_RECOGNITION_THRESHOLD:
                 self.floor_masks.append(potential_floor_mask)
+
+            # TODO save target information
                 
         # Use masks to calculate average distance of each depth cluster
         self.find_obstacles()
-
-        # Display obstacle image (for testing)
-        self.display_obstacles()
 
         # Convert the 3D data to a top-down view
         self.convert_to_top_down()
@@ -107,6 +106,9 @@ class ObstacleAvoidance:
         # Use that information to calculate cost function
 
         # TODO build a map of the environment and use potential field path planning to find a path
+
+        # Display obstacle image (for testing)
+        self.display_obstacles()
         
     def find_obstacles(self):
         # Finds similar value depth pixels and groups them together, then outputs the average depth of those pixels.
@@ -170,12 +172,14 @@ class ObstacleAvoidance:
 
                 # Add new obstacle to global list of obstacles
                 self.obstacles.append(temp_obstacle)
+                
+                # TODO if this obstacle is considered the target, do not include in obstacle array
 
     def convert_to_top_down(self):
         # Convert the obstacles (and target) locations to 2D top-down view
 
         '''
-        The following ASCII art depict the top down view of the robot and the location of the axes when calculating the cartesian
+        The following ASCII art depicts the top down view of the robot and the location of the axes when calculating the cartesian
         coordinates of obstacles. Note that the origin is located at the front of the robot (where the depth sensor is placed).
 
         Top down view of Robot
@@ -193,7 +197,7 @@ class ObstacleAvoidance:
         # of the robot, with origin at camera sensor.
         # Note: the horizontal plane will be perpendicular to the sensor, not necessarily parallel with the floor.
         for temp_obstacle in self.obstacles:
-            point_3d = temp_obstacle.closest_point_cartesian
+            point_3d = temp_obstacle.closest_point_cartesian # TODO this may need to be adapted for big objects, who's closest point is not enough to calculate how to avoid it
 
             # Get x and y coordinates
             x = -1 * point_3d[2] # -1*z
