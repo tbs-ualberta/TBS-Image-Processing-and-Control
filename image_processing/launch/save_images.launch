@@ -1,0 +1,4 @@
+<launch>
+  <node name="kinect_pub_node" type="kinect_pub_node" pkg="kinect_pub" />
+  <node name="img_save_node" pkg="image_processing" type="img_save_node.py" output="screen" />
+</launch>

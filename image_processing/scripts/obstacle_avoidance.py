@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # Authored by: Andor Siegers
 
-# Assumes that the object_detection program is detecting "floor" as it's prompt
+# Assumes that:
+#  - the object_detection program is detecting "floor" as it's prompt
+#  - the object_detection program is detecting "chair" as it's target
 # Integrating the target into this program is doable, but the target would have to be detected and mapped as the goal instead of as an obstacle.
 
 import rospy
@@ -11,17 +13,17 @@ import numpy as np
 import cv2
 import math
 from process_helper import unpack_MaskArray, unpack_RegistrationData, map_depth_mask_to_rgb
-from process_helper import is_mask_overlapping, calculate_centroids, get_camera_parameters, get_point_xyz
+from process_helper import is_mask_overlapping, calculate_centroids, get_camera_parameters, get_point_xyz, display_depth_with_masks
 from sklearn.cluster import DBSCAN
 from geometry_msgs.msg import Point, Twist
 import message_filters
 
 # ----------------------------------------------------- Constants -------------------------------------------------------
-EPS = 5 # for DBSCAN - maximum distance between two depth samples for them to be considered as neighbors (in mm) TODO validate that this is in mm
+EPS = 10 # for DBSCAN - maximum distance between two depth samples for them to be considered as neighbors (in mm)
 
-MIN_SAMPLES = 10 # for DBSCAN - the minimum number of points required to form an obstacle mask
+MIN_SAMPLES = 30 # for DBSCAN - the minimum number of points required to form an obstacle mask
 
-OVERLAP_THRESHOLD = 0.5 # specifies how much of a mask must be contained in the floor mask to be filtered out
+OVERLAP_THRESHOLD = 0.2 # specifies how much of a mask must be contained in the floor mask to be filtered out
 
 FLOOR_RECOGNITION_THRESHOLD = 0.3 # specifies how confident the model needs to be for the floor mask to be used
 # -----------------------------------------------------------------------------------------------------------------------
@@ -70,6 +72,9 @@ class ObstacleAvoidance:
         self.obstacles = []     # stores a list of Obstacle objects
         self.obstacles_2d = []  # stores a list of 2d obstacles
         
+        '''
+        To sync target and mask_data
+        
         # Define subscribers for mask and target data
         self.mask_sub = message_filters.Subscriber('/process/mask_data', MaskArray)
         self.target_sub = message_filters.Subscriber('/process/target', Point)
@@ -77,13 +82,18 @@ class ObstacleAvoidance:
         # Synchronize the topics (excluding mask)
         self.ts = message_filters.ApproximateTimeSynchronizer([self.mask_sub, self.target_sub], 10, 1.0, allow_headerless=True)
         self.ts.registerCallback(self.calculate_path)
+        '''
+
+        # Define subscribers for mask and target data
+        self.mask_sub = rospy.Subscriber('/process/mask_data', MaskArray, self.calculate_path)
 
         # Define velocity publisher
         self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
 
         rospy.loginfo("Obstacle avoidance node started")
 
-    def calculate_path(self, mask_data, target_location):
+    def calculate_path(self, mask_data):
+        rospy.loginfo("Calculating Path...")
         # Runs whenever new mask data is received
 
         # Convert raw mask data from message to usable datatypes
@@ -101,7 +111,7 @@ class ObstacleAvoidance:
         self.find_obstacles()
 
         # Convert the 3D data to a top-down view
-        self.convert_to_top_down()
+        # self.convert_to_top_down()
         
         # Use that information to calculate cost function
 
@@ -115,37 +125,74 @@ class ObstacleAvoidance:
         # This is necessary, because if the prompt is "floor", anything above the floor will all be considered part of the "negative mask"
         # and it will not be separated into separate objects.
 
-        # Uses a DBSCAN (Density-Based Spatial Clustering of Applications with Noise) clustering method to group pixels with similar depth values
-        depth_image = self.depth_image
-        # Preprocess depth image (filter invalid depths)
-        depth_image = depth_image.astype(np.float32)
-        valid_mask = depth_image > 0  # Assuming depth values of 0 are invalid
+        # Reset obstacles array
+        self.obstacles = []
 
-        # Get the coordinates and depth values of valid pixels
-        coords = np.column_stack(np.nonzero(valid_mask))
-        depth_values = depth_image[coords[:, 0], coords[:, 1]]
-        points = np.column_stack((coords, depth_values))
+        # TODO may have to filter out floor before using DBSCAN so that objects detected on the floor are not considered as part of the floor
+
+        # Save variables needed so if they get updated during calculation, it doesn't affect the calculation
+        rgb_image = self.rgb_image
+        depth_image = self.depth_image
+        undistorted_image = self.undistorted_image
+        colour_depth_map = self.colour_depth_map
+        floor_masks = self.floor_masks
+
+        # Uses a DBSCAN (Density-Based Spatial Clustering of Applications with Noise) clustering method to group pixels with similar depth values
+        # Flatten the image and create a list of points (x, y, depth)
+        h, w = depth_image.shape
+        points = []
+
+        for i in range(h):
+            for j in range(w):
+                depth = depth_image[i, j]
+                if depth > 0:  # Filter out zero depth points
+                    points.append([i, j, depth])
+
+        points = np.array(points)
 
         # Apply DBSCAN clustering
-        db = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES, metric='euclidean').fit(points)
+        db = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES).fit(points)
         labels = db.labels_
 
-        # Create masks for each cluster
-        num_labels = len(set(labels)) - (1 if -1 in labels else 0)
-        cluster_masks = [np.zeros(depth_image.shape, dtype=bool) for _ in range(num_labels)]
+        # Add labels to points
+        points_with_labels = np.hstack((points, labels[:, np.newaxis]))
 
-        for label in range(num_labels):
-            cluster_masks[label][coords[labels == label, 0], coords[labels == label, 1]] = True
+        # Initialize array for boolean masks
+        cluster_masks = []
+        unique_labels = set(labels)
+
+        # Remove noise if present
+        num_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
+
+        # Convert cluster information to boolean masks
+        for cluster_id in range(num_clusters):
+            # Create boolean mask for current cluster
+            temp_mask = np.zeros((h,w), dtype=bool)
+
+            # Get points in current cluster
+            cluster_points = points_with_labels[labels == cluster_id]
+            
+            # Set all points in mask corresponding to current cluster to True
+            for point in cluster_points:
+                x, y, _, _ = point
+                temp_mask[int(x), int(y)] = True
+
+            cluster_masks.append(temp_mask)
+
+        # For testing
+        display_depth_with_masks(depth_image, cluster_masks)
         
-        self.obstacles = []
-        for cluster_mask in cluster_masks:
-            # Obtain and save obstacle data
+        # Obtain and save obstacle data
+        for cluster_mask in cluster_masks: # TODO fix this
 
             # Map cluster mask to RGB space
-            rgb_mask = map_depth_mask_to_rgb(cluster_mask, self.rgb_image, self.depth_image, self.colour_depth_map)
+            rgb_mask = map_depth_mask_to_rgb(cluster_mask, rgb_image, depth_image, colour_depth_map)
+
+            # print(colour_depth_map)
+            print("Number of true values in RGB mask: " + str((rgb_mask == True).sum()))
 
             # Filter out any masks that overlap with the floor region
-            if not is_mask_overlapping(rgb_mask, self.floor_masks, OVERLAP_THRESHOLD):
+            if not is_mask_overlapping(rgb_mask, floor_masks, OVERLAP_THRESHOLD):
 
                 temp_obstacle = self.Obstacle()
                 # save only cluster masks that are not overlapping
@@ -162,13 +209,13 @@ class ObstacleAvoidance:
                 temp_obstacle.centroid_px = calculate_centroids(rgb_mask)
 
                 # Convert centroid location to Cartesian space
-                temp_obstacle.centroid_cartesian = get_point_xyz(self.undistorted_image, temp_obstacle.centroid_px, self.depth_params)
+                temp_obstacle.centroid_cartesian = get_point_xyz(undistorted_image, temp_obstacle.centroid_px, self.depth_params)
 
                 # Calculate location of minimum value in array
                 temp_obstacle.closest_point_px = np.unravel_index(cluster_depth_values.argmin(), cluster_depth_values.shape)
 
                 # Convert closest point location to Cartesian space
-                temp_obstacle.closest_point_cartesian = get_point_xyz(self.undistorted_image, temp_obstacle.closest_point_px, self.depth_params)
+                temp_obstacle.closest_point_cartesian = get_point_xyz(undistorted_image, temp_obstacle.closest_point_px, self.depth_params)
 
                 # Add new obstacle to global list of obstacles
                 self.obstacles.append(temp_obstacle)

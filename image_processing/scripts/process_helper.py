@@ -228,7 +228,7 @@ def split_mask(mask, min_connection_width=5):
 
 def is_mask_overlapping(mask, overlap_masks, OVERLAP_THRESHOLD):
     '''
-    Calculates whether mask is overlaping any of overlap_masks by the overlap threshold
+    Calculates whether mask is overlaping any of overlap_masks by the overlap threshold.
     mask - mask that is being checked
     overlap_masks - masks that mask cannot overlap
     OVERLAP_THRESHOLD - percentage of mask that needs to overlap before it is considered "overlapping" (0.0-1.0)
@@ -258,17 +258,27 @@ def calculate_centroids(masks_np):
 
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
+    '''
+    Takes a boolean 2D array representing a mask over a depth image and converts it to RGB space, so it can be applied to the corresponding RGB image.
+    Input:
+    depth_mask - 2D boolean array
+    rgb_image - RGB image (this is only needed for shaping the image array)
+    depth_image - Depth image (only needed for image size)
+    colour_depth_map - integer array that maps the corresponding RGB pixel for each depth pixel
+    '''
     # Initialize mask to fill
-    rgb_mask = np.zeros(rgb_image.shape, dtype=bool)
+    rgb_mask = np.zeros(rgb_image.shape[:2], dtype=bool)
 
     # Get coordinates of mask in depth image space
+    print("Number of true values in depth mask: " + str((depth_mask == True).sum()))
     depth_coords = np.column_stack(np.nonzero(depth_mask))
+    # print(depth_coords)
 
     for coord in depth_coords:
         depth_y, depth_x = coord
         color_index = colour_depth_map[depth_y, depth_x]  # Get the corresponding index in the RGB image
 
-        if color_index < depth_image.size:
+        if color_index < depth_image.size and color_index != -1:
             color_y, color_x = np.unravel_index(color_index, rgb_image.shape[:2])  # Convert linear index to 2D coordinates
             rgb_mask[color_y, color_x] = True  # Mark the corresponding position in the RGB mask
 
@@ -338,3 +348,40 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
     target = Point(target_x, target_y, target_depth) # Note: z in value is in mm, while x and y are in px
     return target
 # -------------------------------------------------- Target finding -------------------------------------------------------
+
+# ------------------------------------------------- Display functions -----------------------------------------------------
+
+def display_depth_with_masks(depth_image, masks):
+    """
+    Normalize the depth image and display the masks over it in green.
+
+    :param depth_image: 2D numpy array representing the raw depth image
+    :param masks: list of 2D numpy arrays representing the masks
+    """
+    # Normalize the depth image to the range [0, 255]
+    depth_image_normalized = cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)
+    depth_image_normalized = np.uint8(depth_image_normalized)
+
+    # Convert the normalized depth image to a 3-channel BGR image
+    depth_image_bgr = cv2.cvtColor(depth_image_normalized, cv2.COLOR_GRAY2BGR)
+    
+    overlay = np.zeros_like(depth_image_bgr)
+
+    # Overlay each mask in green
+    for mask in masks:
+        temp_overlay = np.zeros_like(depth_image_bgr)
+        temp_overlay[mask] = [0, 255, 0]
+        overlay = np.maximum(overlay, temp_overlay)
+
+    depth_image_bgr = cv2.addWeighted(depth_image_bgr, 1, overlay, 0.5, 0)
+
+    # Display the result
+    cv2.imshow('Depth Image with Masks', depth_image_bgr)
+    cv2.waitKey(1)  # Update the display
+
+# Example usage:
+# depth_image = np.random.randint(0, 65535, size=(480, 640), dtype=np.uint16)
+# masks = [np.random.randint(0, 2, size=(480, 640), dtype=np.uint8) for _ in range(3)]
+# display_depth_with_masks(depth_image, masks)
+
+# ------------------------------------------------- Display functions -----------------------------------------------------

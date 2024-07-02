@@ -4,7 +4,7 @@
 # -------------------------------------------- User defined constants ------------------------------------------------
 
 # Select whether to display RGB image
-DISPLAY_RGB = True
+DISPLAY_RGB = False
 
 # Select whether to display depth image
 DISPLAY_DEPTH = True
@@ -97,7 +97,7 @@ class ImageDisplay:
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert rgb image: {e}")
         except Exception as e:
-            rospy.logerr(f"Error in callback_no_mask: {e}")
+            rospy.logerr(f"Error in callback_rgb: {e}")
 
     def callback_depth(self, depth_msg):
         try:
@@ -105,7 +105,7 @@ class ImageDisplay:
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert depth image: {e}")
         except Exception as e:
-            rospy.logerr(f"Error in callback_no_mask: {e}")
+            rospy.logerr(f"Error in callback_depth: {e}")
 
     def callback_ir(self, ir_msg):
         try:
@@ -113,7 +113,7 @@ class ImageDisplay:
         except CvBridgeError as e:
             rospy.logerr(f"Failed to convert ir image: {e}")
         except Exception as e:
-            rospy.logerr(f"Error in callback_no_mask: {e}")
+            rospy.logerr(f"Error in callback_ir: {e}")
     
     def callback_reg(self, reg_msg):
         try:
@@ -122,14 +122,12 @@ class ImageDisplay:
 
             # Ensure the registration data is handled correctly
             if len(reg_data) > 2:
-                __, __, self.reg_image, __, __ = reg_data
+                __, __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
             else:
                 rospy.logwarn("Registration data does not contain enough elements")
                 self.reg_image = None
-            
-            __, __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
         except Exception as e:
-            rospy.logerr(f"Error in callback_no_mask: {e}")
+            rospy.logerr(f"Error in callback_reg: {e}")
 
     def callback_usb(self, usb_img_msg):
         try:
