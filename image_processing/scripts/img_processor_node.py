@@ -13,7 +13,7 @@ PROCESSING_RATE = 1 # in Hz
 TARGET_CONFIDENCE_THRESHOLD = 0.1
 
 # Select whether the output should be printed to the terminal or not
-PRINT_OUTPUT = False
+PRINT_OUTPUT = True
 
 # Select whether the output should clear the console before outputting each cycle data
 CLEAR_OUTPUT = True
@@ -88,9 +88,12 @@ class ImageProcessor:
         
         # rospy.loginfo("Processing images")
         try:
+            # Save start time (to evaluate process time)
+            process_time_start = rospy.Time.now()
+
             prediction_reg_data = self.reg_data
             # Unpack data from message data type
-            rgb_image, depth_image, __, __, prediction_bigdepth_image, __, start_time = unpack_RegistrationData(prediction_reg_data)
+            rgb_image, depth_image, __, __, prediction_bigdepth_image, __, image_time = unpack_RegistrationData(prediction_reg_data)
 
             # For publishing mask and centroid data
             mask_array = MaskArray() 
@@ -102,9 +105,6 @@ class ImageProcessor:
             w, h = image_pil.size
             new_w, new_h = w // 1, h // 1
             image_pil = image_pil.resize((new_w, new_h), PilImg.ANTIALIAS)
-
-            # Save start time (to evaluate process time)
-            time_start = time.time()
 
             # Calculate masks and bounding boxes for images
             masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
@@ -157,7 +157,10 @@ class ImageProcessor:
                         rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
 
-                rospy.loginfo(f"Total processing time: {time.time() - time_start}")
+                process_dif = rospy.Time.now() - process_time_start
+                image_dif = rospy.Time.now() - image_time
+                rospy.loginfo("Total processing time: %d.%09ds", process_dif.secs, process_dif.nsecs)
+                rospy.loginfo("Total time since image taken: %d.%09ds", image_dif.secs, image_dif.nsecs)
                 print("-------------------------------------------------------------------------------------------------")
 
         except (requests.exceptions.RequestException, IOError) as e:
