@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   cv_bridge
   message_generation
+  std_msgs
 )
 
 add_service_files(

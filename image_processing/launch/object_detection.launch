@@ -4,9 +4,9 @@
   <param name="target" value="person" />
 
   <!-- Arguments to enable or disable nodes -->
-  <arg name="run_img_display" default="false" />
+  <arg name="run_img_display" default="true" />
   <arg name="run_img_processor" default="true" />
-  <arg name="run_img_save" default="false" />
+  <arg name="run_img_save" default="true" />
   <arg name="run_mask_display" default="true" />
 
   <!-- Always run Nodes-->

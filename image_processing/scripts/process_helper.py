@@ -9,13 +9,16 @@ from scipy.ndimage import measurements, label
 import cv2
 from kinect_pub.msg import RegistrationData
 from kinect_pub.srv import GetCameraInfo
+from std_msgs.msg import Header
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
 def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, reg_data_msg):
     bridge = CvBridge()
     mask_array = MaskArray()
+    mask_array.header = Header()
     for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, masks_np):
         temp_mask = MaskData()
+        temp_mask.header = Header()
         temp_mask.phrase = phrase
         temp_mask.centroid = Point(centroid[0], centroid[1], depth_val) # the z part of the point is depth (in mm)
                                                                         # this should not be confused for a point in
@@ -63,67 +66,6 @@ def unpack_MaskArray(mask_data):
     except Exception as e:
         rospy.logerr(f"Error processing mask data: {e}")
 
-def convert_to_RegistrationData(rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map):
-    bridge = CvBridge()
-    reg_data_msg = RegistrationData()
-
-    try:
-        # Convert RGB image to ROS Image message
-        rgb_msg = bridge.cv2_to_imgmsg(rgb_image, encoding="bgr8")
-        reg_data_msg.rgb_image = rgb_msg
-
-        # Convert depth image to ROS Image message
-        depth_msg = bridge.cv2_to_imgmsg(depth_image, encoding="32FC1")
-        reg_data_msg.depth_image = depth_msg
-
-        # Convert undistorted depth image to ROS Image message
-        undistorted_msg = bridge.cv2_to_imgmsg(undistorted_image, encoding="32FC1")
-        reg_data_msg.undistorted_image = undistorted_msg
-
-        # Convert registered image to ROS Image message
-        registered_msg = bridge.cv2_to_imgmsg(registered_image, encoding="bgr8")
-        reg_data_msg.registered_image = registered_msg
-
-        # Convert big depth image to ROS Image message
-        bigdepth_msg = bridge.cv2_to_imgmsg(bigdepth_image, encoding="32FC1")
-        reg_data_msg.bigdepth_image = bigdepth_msg
-
-        # Assign colour-depth map
-        reg_data_msg.colour_depth_map = list(colour_depth_map.flatten())
-
-        rospy.loginfo("Converted simple datatypes to RegistrationData message.")
-    except CvBridgeError as e:
-        rospy.logerr(f"Error converting images to ROS messages: {e}")
-
-    return reg_data_msg
-
-def get_camera_parameters():
-    rospy.wait_for_service('/rgbd_out/get_camera_info')
-    try:
-        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
-        response = get_camera_info()
-        
-        # Construct the dictionary with depth camera parameters
-        depth_params = {
-            'cx': response.ir_cx,
-            'cy': response.ir_cy,
-            'fx': response.ir_fx,
-            'fy': response.ir_fy
-        }
-        
-        # Optional: Also get RGB camera parameters if needed
-        rgb_params = {
-            'cx': response.rgb_cx,
-            'cy': response.rgb_cy,
-            'fx': response.rgb_fx,
-            'fy': response.rgb_fy
-        }
-        
-        return depth_params, rgb_params
-    except rospy.ServiceException as e:
-        rospy.logerr("Service call failed: %s" % e)
-        return None, None
-
 def unpack_RegistrationData(data):
     # Unpacks registration data from custom message structure
     bridge = CvBridge()
@@ -165,7 +107,40 @@ def unpack_RegistrationData(data):
     except Exception as e:
         rospy.logerr("Error converting Color Depth Map: %s", e)
 
-    return rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map
+    # Convert Process Start Timestamp
+    try:
+        start_time = data.process_start_time
+    except Exception as e:
+        rospy.logerr("Error converting Color Depth Map: %s", e)
+
+    return rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map, start_time
+
+def get_camera_parameters():
+    rospy.wait_for_service('/rgbd_out/get_camera_info')
+    try:
+        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
+        response = get_camera_info()
+        
+        # Construct the dictionary with depth camera parameters
+        depth_params = {
+            'cx': response.ir_cx,
+            'cy': response.ir_cy,
+            'fx': response.ir_fx,
+            'fy': response.ir_fy
+        }
+        
+        # Optional: Also get RGB camera parameters if needed
+        rgb_params = {
+            'cx': response.rgb_cx,
+            'cy': response.rgb_cy,
+            'fx': response.rgb_fx,
+            'fy': response.rgb_fy
+        }
+        
+        return depth_params, rgb_params
+    except rospy.ServiceException as e:
+        rospy.logerr("Service call failed: %s" % e)
+        return None, None
 
 def convert_to_matrices(camera_info):
     # Initialize intrinsic matrices

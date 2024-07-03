@@ -181,15 +181,7 @@ class ImageSaver:
     def callback_reg(self, reg_msg):
         try:
             # Unpack the registration data
-            reg_data = unpack_RegistrationData(reg_msg)
-
-            # Ensure the registration data is handled correctly
-            if len(reg_data) > 2:
-                __, __, __, self.reg_image, __, __ = unpack_RegistrationData(reg_msg)
-            else:
-                rospy.logwarn("Registration data does not contain enough elements")
-                self.reg_image = None
-            
+            __, __, __, self.reg_image, __, __, __ = unpack_RegistrationData(reg_msg)
             
         except Exception as e:
             rospy.logerr(f"Error in callback_reg: {e}")

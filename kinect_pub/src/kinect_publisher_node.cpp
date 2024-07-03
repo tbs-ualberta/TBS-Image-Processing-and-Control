@@ -16,6 +16,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include "std_msgs/Header.h"
 #include "kinect_pub/GetCameraInfo.h"
 #include "kinect_pub/RegistrationData.h"
 
@@ -125,6 +126,10 @@ int main(int argc, char **argv)
             continue;
         }
 
+        // Get starting timestamp
+        ros::Time start_time = ros::Time::now();
+
+        // Assign frame variables
         libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
         libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];        
         libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
@@ -178,11 +183,15 @@ int main(int argc, char **argv)
 
         kinect_pub::RegistrationData registration_data_msg;
 
+        std_msgs::Header header;
+        header.stamp = ros::Time::now();
+        registration_data_msg.header = header;
         registration_data_msg.rgb_image = *rgb_msg; // RGB image
         registration_data_msg.depth_image = *depth_raw_msg; // Depth image
         registration_data_msg.undistorted_image = *undistorted_msg; // Undistorted depth image
         registration_data_msg.registered_image = *reg_img_msg; // RGB image mapped to depth image
         registration_data_msg.bigdepth_image = *big_depth_msg; // Maps depth onto RGB
+        registration_data_msg.process_start_time = start_time; // Provides start time for evaluating processing time
 
         // Fill colour_depth_map
         for (int i = 0; i < 512 * 424; ++i)

@@ -97,7 +97,7 @@ class ObstacleAvoidance:
 
         # Convert raw mask data from message to usable datatypes
         mask_phrases, centroids, depth_vals, potential_floor_logits, potential_floor_masks, reg_data = unpack_MaskArray(mask_data)
-        self.rgb_image, self.depth_image, self.undistorted_image, __, self.bigdepth_image, self.colour_depth_map = unpack_RegistrationData(reg_data)
+        self.rgb_image, self.depth_image, self.undistorted_image, __, self.bigdepth_image, self.colour_depth_map, start_time = unpack_RegistrationData(reg_data)
 
         # filter out all masks that are not labelled as "floor" and not above floor recognition threshold
         for phrase, logit, potential_floor_mask in zip(mask_phrases, potential_floor_logits, potential_floor_masks):

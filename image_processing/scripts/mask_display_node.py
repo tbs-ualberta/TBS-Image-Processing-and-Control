@@ -39,7 +39,7 @@ class MaskDisplay:
         reg_data = None
         # Convert raw mask data from message to usable datatypes
         self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, reg_data = unpack_MaskArray(mask_data)
-        self.rgb_image, self.depth_image, __, __, __, __ = unpack_RegistrationData(reg_data)
+        self.rgb_image, self.depth_image, __, __, __, __, __ = unpack_RegistrationData(reg_data)
 
         # Display the mask data overlayed over rgb image
         self.display_masks()
