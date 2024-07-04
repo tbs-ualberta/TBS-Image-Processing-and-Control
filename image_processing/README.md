@@ -38,7 +38,7 @@ First, the “language segment anything” (LangSAM) package needs to be install
 "mask_display_node" receives the mask data and displays it using the OpenCV python package. It does this by overlaying each mask in green over the base RGB image. It then draws each centroid over those masks with accompanying text that describes the phrase (or object detected by the program) and the depth of the centroid (in meters). This program also publishes the final image to a ROS topic, which is read by the image saving program for image saving.
 
 # Obstacle Avoidance Program
-"obstacle_avoidance.py" receives the mask data, along with the rgb image and depth data from the image processing program. It then uses the depth data to calculate clusters of similar value depth pixels, which are then labeled as obstacles. The program then calculates the depth (or distance from the camera) of each obstacle and uses these depths in a cost function to calculate the optimal path.
+"obstacle_avoidance.py" receives the mask data, along with the rgb image and depth data from the image processing program. It then uses the depth data to calculate clusters of similar value depth pixels using the DBSCAN algorithm, which are then labeled as obstacles. The program then calculates the depth (or distance from the camera) of each obstacle and saves it for use in a potential field path planning model. This program is still a work in progress and does not work in its current state.
 
 **Note:** this program assumes that the image processing program's text prompt contains "floor" and that its target is NOT "floor.
 
