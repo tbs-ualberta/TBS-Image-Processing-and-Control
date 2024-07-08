@@ -16,21 +16,21 @@ SAVE_RATE = 1 # in Hz
 SAVE_NORM = False
 
 # Select whether to save RGB images
-SAVE_RGB = True
+SAVE_RGB = False
 
 # Select whether to save depth images
-SAVE_DEPTH = True
+SAVE_DEPTH = False
 
 # Select whether to save IR images
 SAVE_IR = False
 
 # Select whether to save registered images
-SAVE_REG = True
+SAVE_REG = False
 
 # Select whether to save masked images
 # Note: since the processing time is much slower than other images, and the images get published on a different frequency than the raw images,
 # this saves at the rate at which the processed images are published.
-SAVE_MASK = False
+SAVE_MASK = True
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -117,33 +117,38 @@ class ImageSaver:
     
     def save_images(self, event):
         # Saves images to computer
+        saved_img = False
         # RGB
         if SAVE_RGB and self.rgb_image is not None:
             os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "rgb"))
             name_str_rgb = "rgb_" + str(self.save_count_raw).zfill(6) + ".png"
             cv2.imwrite(str(name_str_rgb), self.rgb_image)
+            saved_img = True
 
         # depth
         if SAVE_DEPTH and self.depth_image is not None:
             os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "depth"))
             name_str_depth = "depth_" + str(self.save_count_raw).zfill(6) + ".tiff"
             imageio.imwrite(str(name_str_depth), self.depth_image)
+            saved_img = True
 
         # IR
         if SAVE_IR and self.ir_image is not None:
             os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "ir"))
             name_str_ir = "ir_" + str(self.save_count_raw).zfill(6) + ".tiff"
             imageio.imwrite(str(name_str_ir), self.ir_image)
+            saved_img = True
         
         # reg
         if SAVE_REG and self.reg_image is not None:
             os.chdir(os.path.join(SAVE_PATH, SAVE_FOLDER_NAME, "reg"))
             name_str_reg = "reg_" + str(self.save_count_raw).zfill(6) + ".png"
             imageio.imwrite(str(name_str_reg), self.reg_image)
-
-        self.save_count_raw += 1
-
-        rospy.loginfo(f"Saved raw images at index" + str(self.save_count_raw).zfill(6))
+            saved_img = True
+        
+        if saved_img:
+            self.save_count_raw += 1
+            rospy.loginfo(f"Saved raw images at index" + str(self.save_count_raw).zfill(6))
 
     def save_mask_img(self, mask_msg):
         self.mask_image = self.bridge.imgmsg_to_cv2(mask_msg, desired_encoding="rgb8")

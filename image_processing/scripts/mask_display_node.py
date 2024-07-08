@@ -9,6 +9,9 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from process_helper import unpack_MaskArray, unpack_RegistrationData
 
+DISPLAY_PHRASE = True
+DISPLAY_DEPTH = True
+RESIZE_FACTOR = 0.85
 class MaskDisplay:
     def __init__(self):
         self.bridge = CvBridge()
@@ -70,16 +73,26 @@ class MaskDisplay:
             for centroid, phrase, depth, logit in zip(self.centroids, self.phrases, self.depth_vals, self.logits):
                 # Draw centroid
                 cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red colour for centroid
+                
+                if DISPLAY_PHRASE:
+                    text_to_show = phrase
+                    if DISPLAY_DEPTH:
+                        text_to_show = text_to_show + f", {depth:.2f}m"
+                elif DISPLAY_DEPTH:
+                    text_to_show = f"{depth:.2f}m"
 
-                # Put text for phrase and depth value
-                cv2.putText(overlay, f"{phrase}, {depth:.2f}m", (centroid[0] + 10, centroid[1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                # Display text beside centroid
+                if DISPLAY_DEPTH or DISPLAY_PHRASE:
+                    cv2.putText(overlay, text_to_show, (centroid[0] + 10, centroid[1] - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
             # Publish image to ROS topic for image saving
             self.mask_img_pub.publish(self.bridge.cv2_to_imgmsg(overlay, encoding="bgr8"))
 
+            overlay_small = cv2.resize(overlay, (0,0), fx=RESIZE_FACTOR, fy=RESIZE_FACTOR) 
+
             # Display image in window
-            cv2.imshow("Mask Overlay Image", overlay)
+            cv2.imshow("Mask Overlay Image", overlay_small)
 
             # Uncomment to check if mask is displaying properly - for testing
             # cv2.imshow("Depth Image", self.depth_image)

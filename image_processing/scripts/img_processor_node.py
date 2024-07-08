@@ -13,7 +13,7 @@ PROCESSING_RATE = 1 # in Hz
 TARGET_CONFIDENCE_THRESHOLD = 0.1
 
 # Select whether the output should be printed to the terminal or not
-PRINT_OUTPUT = True
+PRINT_OUTPUT = False
 
 # Select whether the output should clear the console before outputting each cycle data
 CLEAR_OUTPUT = True
