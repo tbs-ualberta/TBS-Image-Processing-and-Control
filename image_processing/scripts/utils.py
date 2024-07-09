@@ -240,7 +240,7 @@ def get_avg_depth(mask_np, bigdepth):
     # Use coordinate list to find corresponding depth values
     depth_vals = []
     for y, x in coordinates:
-        px_depth = bigdepth[y+1,x]
+        px_depth = bigdepth[y+1, x]
         if px_depth != float('inf'):
             depth_vals.append(px_depth)
 
@@ -326,15 +326,15 @@ def get_point_xyz(undistorted, point, depth_params):
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
 # -------------------------------------------------- Target finding -------------------------------------------------------
-def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, centroid_depths, logits):
+def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, object_depths, logits):
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
     # Find minimum depth of nearest target
     target_x = -1
     target_y = -1
     target_depth = -1 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
-    min_depth = 100000
-    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, centroid_depths, logits):
+    min_depth = float('inf')
+    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, object_depths, logits):
         if target_phrase in temp_phrase and temp_depth < min_depth and temp_logit > target_confidence_threshold:
             target_x = temp_centroid[0]
             target_y = temp_centroid[1]

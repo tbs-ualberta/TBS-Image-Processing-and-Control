@@ -127,7 +127,7 @@ class ImageProcessor:
             avg_depths = [get_avg_depth(mask, prediction_bigdepth_image) for mask in masks_np]
 
             # Find target
-            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, centroid_depths, logits)
+            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
 
             # Convert to correct message type for publishing
             mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, prediction_reg_data)
