@@ -7,11 +7,12 @@ from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from process_helper import unpack_MaskArray, unpack_RegistrationData
+from utils import unpack_MaskArray, unpack_RegistrationData
 
-DISPLAY_PHRASE = True
-DISPLAY_DEPTH = True
-RESIZE_FACTOR = 0.85
+DISPLAY_PHRASE = True   # Selects whether the phrase should be displayed along with the masked image
+DISPLAY_DEPTH = True    # Selects whether the depth should be displayed along with the masked image
+RESIZE_FACTOR = 0.85    # Determines how the image should be scaled, as it doesn't fit in a 1080p window natively
+
 class MaskDisplay:
     def __init__(self):
         self.bridge = CvBridge()

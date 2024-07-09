@@ -38,7 +38,7 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from process_helper import calculate_centroids, find_target, convert_to_MaskArray, unpack_RegistrationData
+from utils import calculate_centroids, find_target, convert_to_MaskArray, unpack_RegistrationData
 import warnings
 from transformers import logging
 from kinect_pub.msg import RegistrationData

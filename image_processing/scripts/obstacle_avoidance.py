@@ -3,7 +3,6 @@
 
 # Assumes that:
 #  - the object_detection program is detecting "floor" as it's prompt
-#  - the object_detection program is detecting "chair" as it's target
 # Integrating the target into this program is doable, but the target would have to be detected and mapped as the goal instead of as an obstacle.
 
 import rospy
@@ -12,7 +11,7 @@ from cv_bridge import CvBridge
 import numpy as np
 import cv2
 import math
-from process_helper import unpack_MaskArray, unpack_RegistrationData, is_mask_overlapping, get_camera_parameters, display_depth_with_masks
+from utils import unpack_MaskArray, unpack_RegistrationData, is_mask_overlapping, get_camera_parameters, display_depth_with_masks
 from sklearn.cluster import DBSCAN
 from geometry_msgs.msg import Twist
 

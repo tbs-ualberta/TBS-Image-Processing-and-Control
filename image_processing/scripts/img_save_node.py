@@ -50,7 +50,7 @@ import os
 import shutil
 import imageio
 from kinect_pub.msg import RegistrationData
-from process_helper import unpack_RegistrationData
+from utils import unpack_RegistrationData
 
 class ImageSaver:
     def __init__(self):

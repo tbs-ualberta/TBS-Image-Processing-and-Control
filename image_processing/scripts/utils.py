@@ -142,7 +142,7 @@ def get_camera_parameters():
         rospy.logerr("Service call failed: %s" % e)
         return None, None
 
-def convert_to_matrices(camera_info):
+def convert_to_matrices(camera_info): # This function is not used, but could be useful in the future
     # Initialize intrinsic matrices
     rgb_intrinsics = np.zeros((3,3))
     depth_intrinsics = np.zeros((3,3))

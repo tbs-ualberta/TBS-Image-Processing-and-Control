@@ -38,7 +38,7 @@ from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 from kinect_pub.msg import RegistrationData
-from process_helper import unpack_RegistrationData
+from utils import unpack_RegistrationData
 
 class ImageDisplay:
     def __init__(self):
