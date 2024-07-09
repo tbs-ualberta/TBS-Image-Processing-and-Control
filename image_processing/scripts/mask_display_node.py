@@ -11,9 +11,9 @@ from utils import unpack_MaskArray, unpack_RegistrationData
 import traceback
 
 DISPLAY_PHRASE = True       # Selects whether the phrase should be displayed along with the masked image
-DISPLAY_DEPTH = True        # Selects whether the depth should be displayed along with the masked image
+DISPLAY_CENT_DEPTH = True   # Selects whether the depth of the centroid should be displayed
 DISPLAY_AVG_DEPTH = True    # Selects whether the average depth of the mask should be displayed
-RESIZE_FACTOR = 0.85        # Determines how the image should be scaled, as it doesn't fit in a 1080p window natively
+SCALE_FACTOR = 0.85         # Determines how much the image should be scaled, as it doesn't fit in a 1080p window natively
 
 class MaskDisplay:
     def __init__(self):
@@ -80,24 +80,28 @@ class MaskDisplay:
                 
                 if DISPLAY_PHRASE:
                     text_to_show = phrase
-                    if DISPLAY_DEPTH:
-                        text_to_show = text_to_show + ", "
+                    if DISPLAY_CENT_DEPTH or DISPLAY_AVG_DEPTH:
+                        text_to_show += ", "
 
-                if DISPLAY_DEPTH:
-                    if DISPLAY_AVG_DEPTH:
-                        text_to_show = text_to_show + f"{avg_depth:.2f}m"
-                    else:
-                        text_to_show = text_to_show + f"{cent_depth:.2f}m"
+                
+                if DISPLAY_AVG_DEPTH:
+                    text_to_show += f"avg: {avg_depth:.2f}m"
+
+                    if DISPLAY_CENT_DEPTH:
+                        text_to_show += ", "
+
+                if DISPLAY_CENT_DEPTH:
+                    text_to_show += f"cent: {cent_depth:.2f}m"
 
                 # Display text beside centroid
-                if DISPLAY_DEPTH or DISPLAY_PHRASE:
+                if DISPLAY_PHRASE or DISPLAY_CENT_DEPTH or DISPLAY_AVG_DEPTH:
                     cv2.putText(overlay, text_to_show, (centroid[0] + 10, centroid[1] - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
             # Publish image to ROS topic for image saving
             self.mask_img_pub.publish(self.bridge.cv2_to_imgmsg(overlay, encoding="bgr8"))
 
-            overlay_small = cv2.resize(overlay, (0,0), fx=RESIZE_FACTOR, fy=RESIZE_FACTOR) 
+            overlay_small = cv2.resize(overlay, (0,0), fx=SCALE_FACTOR, fy=SCALE_FACTOR) 
 
             # Display image in window
             cv2.imshow("Mask Overlay Image", overlay_small)
