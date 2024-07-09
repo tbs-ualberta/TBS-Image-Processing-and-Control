@@ -12,11 +12,11 @@ from kinect_pub.srv import GetCameraInfo
 from std_msgs.msg import Header
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, reg_data_msg):
+def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, reg_data_msg):
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
-    for centroid, depth_val, phrase, logit, mask in zip(centroids_as_pixels, depth_vals, phrases, logits, masks_np):
+    for centroid, depth_val, phrase, logit, avg_depth, mask in zip(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np):
         temp_mask = MaskData()
         temp_mask.header = Header()
         temp_mask.phrase = phrase
@@ -24,6 +24,7 @@ def convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks
                                                                         # this should not be confused for a point in
                                                                         # 3d cartesian space, as x and y are in px
         temp_mask.logit = logit
+        temp_mask.avg_depth = avg_depth
         mask_image = (mask * 255).astype(np.uint8)
         temp_mask.mask = bridge.cv2_to_imgmsg(mask_image, encoding="mono8") 
 
@@ -39,8 +40,9 @@ def unpack_MaskArray(mask_data):
         # Empty arrays
         phrases = []
         centroids = []
-        depth_vals = []
+        centroid_depths = []
         logits = []
+        avg_depths = []
         masks = []  # boolean arrays
 
         # Convert data back to accessible data types
@@ -49,17 +51,19 @@ def unpack_MaskArray(mask_data):
             centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
             depth_val = temp_mask.centroid.z / 1000
             temp_logit = temp_mask.logit
+            temp_avg_depth = temp_mask.avg_depth / 1000
 
             mask_img = bridge.imgmsg_to_cv2(temp_mask.mask, desired_encoding="mono8")
             mask_img = (mask_img / 255).astype(bool)  # Convert back to boolean array
             
             phrases.append(temp_phrase)
             centroids.append(centroid_loc)
-            depth_vals.append(depth_val)
+            centroid_depths.append(depth_val)
             logits.append(temp_logit)
+            avg_depths.append(temp_avg_depth)
             masks.append(mask_img)
 
-        return phrases, centroids, depth_vals, logits, masks, mask_data.registration_data
+        return phrases, centroids, centroid_depths, logits, avg_depths, masks, mask_data.registration_data
 
     except CvBridgeError as e:
         rospy.logerr(f"CvBridge Error: {e}")
@@ -229,6 +233,22 @@ def calculate_centroids(masks_np):
 
     return centroids_as_pixels
 
+def get_avg_depth(mask_np, bigdepth):
+    # Convert boolean mask to list of coordinates
+    coordinates = np.argwhere(mask_np)
+
+    # Use coordinate list to find corresponding depth values
+    depth_vals = []
+    for y, x in coordinates:
+        px_depth = bigdepth[y+1,x]
+        if px_depth != float('inf'):
+            depth_vals.append(px_depth)
+
+    # Calculate average of depth values
+    avg_depth = np.mean(depth_vals)
+
+    return avg_depth
+
 # ----------------------------------------------- Centroid calculation ----------------------------------------------------
 
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
@@ -306,7 +326,7 @@ def get_point_xyz(undistorted, point, depth_params):
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
 # -------------------------------------------------- Target finding -------------------------------------------------------
-def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, depth_vals, logits):
+def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, centroid_depths, logits):
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
     # Find minimum depth of nearest target
@@ -314,7 +334,7 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
     target_y = -1
     target_depth = -1 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
     min_depth = 100000
-    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, depth_vals, logits):
+    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, centroid_depths, logits):
         if target_phrase in temp_phrase and temp_depth < min_depth and temp_logit > target_confidence_threshold:
             target_x = temp_centroid[0]
             target_y = temp_centroid[1]

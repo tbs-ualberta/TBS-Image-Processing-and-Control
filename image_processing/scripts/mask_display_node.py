@@ -8,10 +8,12 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from utils import unpack_MaskArray, unpack_RegistrationData
+import traceback
 
-DISPLAY_PHRASE = True   # Selects whether the phrase should be displayed along with the masked image
-DISPLAY_DEPTH = True    # Selects whether the depth should be displayed along with the masked image
-RESIZE_FACTOR = 0.85    # Determines how the image should be scaled, as it doesn't fit in a 1080p window natively
+DISPLAY_PHRASE = True       # Selects whether the phrase should be displayed along with the masked image
+DISPLAY_DEPTH = True        # Selects whether the depth should be displayed along with the masked image
+DISPLAY_AVG_DEPTH = True    # Selects whether the average depth of the mask should be displayed
+RESIZE_FACTOR = 0.85        # Determines how the image should be scaled, as it doesn't fit in a 1080p window natively
 
 class MaskDisplay:
     def __init__(self):
@@ -23,8 +25,9 @@ class MaskDisplay:
         # Initialize mask data arrays
         self.phrases = []
         self.centroids = []
-        self.depth_vals = []
+        self.centroid_depths = []
         self.logits = []
+        self.avg_depths = []
         self.masks = [] # boolean array
         self.rgb_image = None # RGB image accompanying mask data
         self.depth_image = None # Depth image accompanying mask data
@@ -42,7 +45,7 @@ class MaskDisplay:
 
         reg_data = None
         # Convert raw mask data from message to usable datatypes
-        self.phrases, self.centroids, self.depth_vals, self.logits, self.masks, reg_data = unpack_MaskArray(mask_data)
+        self.phrases, self.centroids, self.centroid_depths, self.logits, self.avg_depths, self.masks, reg_data = unpack_MaskArray(mask_data)
         self.rgb_image, self.depth_image, __, __, __, __, __ = unpack_RegistrationData(reg_data)
 
         # Display the mask data overlayed over rgb image
@@ -71,16 +74,20 @@ class MaskDisplay:
             # Overlay mask on the image
             cv2.addWeighted(mask_sum, alpha, overlay, 1 - alpha, 0, overlay)
 
-            for centroid, phrase, depth, logit in zip(self.centroids, self.phrases, self.depth_vals, self.logits):
+            for centroid, phrase, cent_depth, logit, avg_depth in zip(self.centroids, self.phrases, self.centroid_depths, self.logits, self.avg_depths):
                 # Draw centroid
                 cv2.circle(overlay, (centroid[0], centroid[1]), 5, (0, 0, 255), -1)  # Red colour for centroid
                 
                 if DISPLAY_PHRASE:
                     text_to_show = phrase
                     if DISPLAY_DEPTH:
-                        text_to_show = text_to_show + f", {depth:.2f}m"
-                elif DISPLAY_DEPTH:
-                    text_to_show = f"{depth:.2f}m"
+                        text_to_show = text_to_show + ", "
+
+                if DISPLAY_DEPTH:
+                    if DISPLAY_AVG_DEPTH:
+                        text_to_show = text_to_show + f"{avg_depth:.2f}m"
+                    else:
+                        text_to_show = text_to_show + f"{cent_depth:.2f}m"
 
                 # Display text beside centroid
                 if DISPLAY_DEPTH or DISPLAY_PHRASE:
@@ -102,6 +109,7 @@ class MaskDisplay:
 
         except Exception as e:
             rospy.logerr(f"Error displaying masks: {e}")
+            rospy.logerr(traceback.format_exc())
     
     def spin(self):
         rospy.spin()

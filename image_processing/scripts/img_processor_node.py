@@ -13,7 +13,7 @@ PROCESSING_RATE = 1 # in Hz
 TARGET_CONFIDENCE_THRESHOLD = 0.1
 
 # Select whether the output should be printed to the terminal or not
-PRINT_OUTPUT = False
+PRINT_OUTPUT = True
 
 # Select whether the output should clear the console before outputting each cycle data
 CLEAR_OUTPUT = True
@@ -33,12 +33,11 @@ from image_processing.msg import MaskArray
 from cv_bridge import CvBridge
 import os
 import sys
-import time
 import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from utils import calculate_centroids, find_target, convert_to_MaskArray, unpack_RegistrationData
+from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray, unpack_RegistrationData
 import warnings
 from transformers import logging
 from kinect_pub.msg import RegistrationData
@@ -93,7 +92,7 @@ class ImageProcessor:
 
             prediction_reg_data = self.reg_data
             # Unpack data from message data type
-            rgb_image, depth_image, __, __, prediction_bigdepth_image, __, image_time = unpack_RegistrationData(prediction_reg_data)
+            rgb_image, depth_image, undistorted_image, __, prediction_bigdepth_image, __, image_time = unpack_RegistrationData(prediction_reg_data)
 
             # For publishing mask and centroid data
             mask_array = MaskArray() 
@@ -120,14 +119,18 @@ class ImageProcessor:
             centroids_as_pixels = calculate_centroids(masks_np)
 
             # Find corresponding RGB values from pixel coordinates
-            depth_vals = []
-            depth_vals = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
+            centroid_depths = []
+            centroid_depths = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
+
+            # Find average depth value of each mask
+            avg_depths = []
+            avg_depths = [get_avg_depth(mask, prediction_bigdepth_image) for mask in masks_np]
 
             # Find target
-            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, depth_vals, logits)
+            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, centroid_depths, logits)
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, depth_vals, phrases, logits, masks_np, prediction_reg_data)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, prediction_reg_data)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -151,10 +154,10 @@ class ImageProcessor:
 
                     # Print calculated data to console
                     print("-------------------------------------------------------------------------------------------------")
-                    for i, (cent, depth, phr, log) in enumerate(zip(centroids_as_pixels, depth_vals, phrases, logits)):
+                    for i, (cent_coord, avg_depth, phr, log) in enumerate(zip(centroids_as_pixels, avg_depths, phrases, logits)):
                         # Print info
                         rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
-                        rospy.loginfo(f"Centroid at: {cent}, Depth value: {depth} mm")
+                        rospy.loginfo(f"Centroid at: {cent_coord}, Average depth value: {avg_depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
 
                 process_dif = rospy.Time.now() - process_time_start

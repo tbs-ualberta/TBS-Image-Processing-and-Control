@@ -94,7 +94,7 @@ class ObstacleAvoidance:
 
     def mask_data_callback(self, mask_data):
         # Convert raw mask data from message to usable datatypes
-        mask_phrases, centroids, depth_vals, potential_floor_logits, potential_floor_masks, reg_data = unpack_MaskArray(mask_data)
+        mask_phrases, centroids, depth_vals, potential_floor_logits, avg_depths, potential_floor_masks, reg_data = unpack_MaskArray(mask_data)
         self.rgb_image, self.depth_image, self.undistorted_image, __, self.bigdepth_image, self.colour_depth_map, self.global_start_time = unpack_RegistrationData(reg_data)
 
         # filter out all masks that are not labelled as "floor" and not above floor recognition threshold

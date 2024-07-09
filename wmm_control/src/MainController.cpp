@@ -43,7 +43,8 @@ const double KD_DISTANCE = 0.05;
 const double MAX_LIN_VEL = 0.5; // m/s // should be 0.3
 const double MIN_LIN_VEL = 0.0; // m/s // Robot will not go backwards
 
-// Camera parameters - from: https://www.researchgate.net/publication/283482095_Calibration_of_Kinect_for_Xbox_One_and_Comparison_between_the_Two_Generations_of_Microsoft_Sensors
+// Camera parameters - from: https://www.researchgate.net/publication/283482095_Calibration_of_Kinect_for_Xbox_One_and_Comparison_between_t\he_Two_Generations_of_Microsoft_Sensors
+// TODO update this to reflect changes to camera data data types
 const int FRAME_WITDH = 1920;
 const double HORIZONTAL_FOV_DEG = 70;
 const double HORIZONTAL_FOV_RAD = HORIZONTAL_FOV_DEG * M_PI / 180.0;
