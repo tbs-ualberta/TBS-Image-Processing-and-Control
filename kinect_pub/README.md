@@ -15,12 +15,17 @@ The steps in this document were done with the following assumptions:
 - GCC version: 9.4.0
 - Camera: Xbox Kinect V2 (Xbox One)
 
-# libfreenect2 and Dependency Installation
+## Dependencies
+- [ROS Noetic](https://wiki.ros.org/noetic)
+- [OpenCV2](https://opencv.org/)
+- [libfreenect2](https://openkinect.github.io/libfreenect2/) (see below for installation instructions)
+
+# Installing libfreenect2 and its dependencies
 
 1. First, install CUDA by following the instructions shown [here](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
-2. Next, install the CUDA samples. This is important because libfreenect2 utilizes CUDA samples in its operation. It is installed by cloning the CUDA Samples Github repository and building it, following the instructions given in the README file: https://github.com/nvidia/cuda-samples
-3. libfreenect2 is installed by following the instructions given here: https://github.com/OpenKinect/libfreenect2
-    - Note: building this repository was problematic and required extensive troubleshooting. The package uses CUDA to build by default. This can cause issues. Additionally, the package should be installed to be discoverable by the new ROS package that will be written later. To account for these problems, install with the following parameters:
+2. Next, install the CUDA samples. This is important because libfreenect2 utilizes CUDA samples in its operation. It is installed by cloning the CUDA Samples Github repository and building it, following the instructions given [here](https://github.com/nvidia/cuda-samples).
+3. libfreenect2 is installed by following the instructions given [here](https://github.com/OpenKinect/libfreenect2).
+    - Note: building this repository can be problematic and require extensive troubleshooting. The package uses CUDA to build by default. This can cause issues. Additionally, the package should be installed to be discoverable by the new ROS package that will be written later. To account for these problems, install with the following parameters:
         
         ```bash
         cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/freenect2 -Dfreenect2_DIR=$HOME/freenect2/lib/cmake/freenect2 -DENABLE_CUDA=OFF
