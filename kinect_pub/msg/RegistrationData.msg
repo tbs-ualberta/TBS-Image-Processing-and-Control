@@ -1,8 +1,0 @@
-std_msgs/Header header
-sensor_msgs/Image rgb_image
-sensor_msgs/Image depth_image
-sensor_msgs/Image undistorted_image
-sensor_msgs/Image registered_image
-sensor_msgs/Image bigdepth_image
-int32[] colour_depth_map
-time process_start_time
