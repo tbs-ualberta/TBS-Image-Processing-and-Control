@@ -27,7 +27,8 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 
 # --------------------------------------------------------------------------------------------------------------------
 
-import rospy
+import rclpy
+from rclpy.node import Node
 from geometry_msgs.msg import Point
 from image_processing.msg import MaskArray
 from cv_bridge import CvBridge
@@ -47,28 +48,25 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 logging.set_verbosity_error()
 
-class ImageProcessor:
+class ImageProcessor(Node):
     def __init__(self):
+        super().__init__('image_processor')
         self.bridge = CvBridge()
 
-        # Initialize node
-        rospy.init_node('image_processor', anonymous=True)
-        rospy.on_shutdown(self.cleanup)
-
         # This specifies the prompt which the model masks
-        self.prompt = rospy.get_param('prompt', 'person.chair')# multiple objects can be detected using a '.' as a separator
+        self.prompt = self.declare_parameter('prompt', 'person.chair').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
 
         # Specifies target. This allows for detection of multiple objects but only targetting of one
-        self.target = rospy.get_param('target', 'person') # must be contained in the prompt
+        self.target = self.declare_parameter('target', 'person').get_parameter_value().string_value # must be contained in the prompt
         
         # Define publisher for mask data
-        self.mask_pub = rospy.Publisher("process/mask_data", MaskArray, queue_size=10)
+        self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
 
         # Define publisher for target position data
-        self.target_pub = rospy.Publisher("process/target", Point, queue_size=10) # in px
+        self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
         # Define subscribers for registration data (which includes rgb and depth images)
-        self.reg_sub = rospy.Subscriber('rgbd_out/reg_data', RegistrationData, self.callback)
+        self.reg_sub = self.create_subscription(RegistrationData, 'rgbd_out/reg_data', self.callback, 10)
 
         # Initialize registration data message
         self.reg_data = None
@@ -77,18 +75,17 @@ class ImageProcessor:
         self.model = LangSAM(sam_type = "vit_b")
 
         # Set up timers to call process function
-        self.processing_timer = rospy.Timer(rospy.Duration(PROCESSING_INTERVAL), self.process_images)
+        self.processing_timer = self.create_timer(PROCESSING_INTERVAL, self.process_images)
         
-        rospy.loginfo("Image Processor Node Started")
+        self.get_logger().info("Image Processor Node Started")
 
-    def process_images(self, event):
+    def process_images(self):
         if self.reg_data is None:
             return
         
-        # rospy.loginfo("Processing images")
         try:
             # Save start time (to evaluate process time)
-            process_time_start = rospy.Time.now()
+            process_time_start = self.get_clock().now()
 
             prediction_reg_data = self.reg_data
             # Unpack data from message data type
@@ -109,7 +106,7 @@ class ImageProcessor:
             masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
 
             # Initialize target values
-            target_pos = Point(-1,-1,-1)
+            target_pos = Point(x=-1,y=-1,z=-1)
 
             # Convert masks to numpy arrays
             masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
@@ -146,7 +143,7 @@ class ImageProcessor:
                 # Print data to console
                 if len(masks) == 0:
                     # If no objects detected
-                    rospy.loginfo(f"No objects of the '{self.prompt}' prompt detected in image.")
+                    self.get_logger().info(f"No objects of the '{self.prompt}' prompt detected in image.")
                     # if object is not detected in frame, all target values will be -1 (see above)
 
                 else:
@@ -156,32 +153,37 @@ class ImageProcessor:
                     print("-------------------------------------------------------------------------------------------------")
                     for i, (cent_coord, avg_depth, phr, log) in enumerate(zip(centroids_as_pixels, avg_depths, phrases, logits)):
                         # Print info
-                        rospy.loginfo(f"Mask {i+1}: {phr} (confidence of {log}")
-                        rospy.loginfo(f"Centroid at: {cent_coord}, Average depth value: {avg_depth} mm")
+                        self.get_logger().info(f"Mask {i+1}: {phr} (confidence of {log}")
+                        self.get_logger().info(f"Centroid at: {cent_coord}, Average depth value: {avg_depth} mm")
                         print("-------------------------------------------------------------------------------------------------")
 
-                process_dif = rospy.Time.now() - process_time_start
-                image_dif = rospy.Time.now() - image_time
-                rospy.loginfo("Total processing time: %d.%09ds", process_dif.secs, process_dif.nsecs)
-                rospy.loginfo("Total time since image taken: %d.%09ds", image_dif.secs, image_dif.nsecs)
+                process_dif = self.get_clock().now() - process_time_start
+                image_dif = self.get_clock().now() - image_time
+                self.get_logger().info("Total processing time: %d.%09ds", process_dif.seconds, process_dif.nanoseconds)
+                self.get_logger().info("Total time since image taken: %d.%09ds", image_dif.seconds, image_dif.nanoseconds)
                 print("-------------------------------------------------------------------------------------------------")
 
         except (requests.exceptions.RequestException, IOError) as e:
-            rospy.logerr(f"Error: {e}")
+            self.get_logger().error(f"Error: {e}")
 
     def callback(self, reg_data):
         # Unpack registration data
         self.reg_data = reg_data
 
     def cleanup(self):
-        rospy.loginfo("Shutting down Image Processor Node")
+        self.get_logger().info("Shutting down Image Processor Node")
 
-    def spin(self):
-        rospy.spin()
+def main(args=None):
+    rclpy.init(args=args)
+    image_processor = ImageProcessor()
+    try:
+        rclpy.spin(image_processor)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        image_processor.cleanup()
+        image_processor.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
-    try:
-        image_processor = ImageProcessor()
-        image_processor.spin()
-    except rospy.ROSInterruptException:
-        pass
+    main()
