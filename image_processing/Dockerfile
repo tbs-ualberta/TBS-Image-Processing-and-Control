@@ -1,8 +1,31 @@
 # Use an official ROS2 base image
-FROM ros:humble
+FROM pytorch/pytorch:latest
 
 # prevent apt from hanging
 ARG DEBIAN_FRONTEND=noninteractive
+
+# Install ROS
+# # Install UTF-8 locale
+# RUN apt install locales \
+#     && locale-gen en_US en_US.UTF-8 \
+#     && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+#     && export LANG=en_US.UTF-8
+# Setup sources
+RUN apt-get update && apt-get install -y software-properties-common curl && \
+    add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+# Install ROS2 packages # TODO change this
+RUN apt update && apt upgrade \ 
+    && apt install ros-humble-ros-base
+# Source setup script
+RUN source /opt/ros/humble/setup.bash
+
+# Set up the ROS2 workspace
+WORKDIR /ros_ws/src
+
+# Copy ROS2 workspace into the container
+COPY . /ros_ws/src/Image-Processing-and-Control/image_processing
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,22 +33,14 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-rosdep \
     ros-humble-cv-bridge \
+    # For lang-segment-anything
+    git \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up the ROS2 workspace
-WORKDIR /ros_ws/src
-
-# Copy your ROS2 workspace into the container
-COPY . /ros_ws/src/image_processing
-
-# For Lang-Segment-Anything
-# installing system dependencies:
-RUN apt install -y git
-RUN apt install libgl1-mesa-glx -y
-RUN apt install libglib2.0-0 -y
-
 # Install lang-segment-anything dependencies
-RUN cd lang-segment-anything
+WORKDIR /ros_ws/src/Image-Processing-and-Control/image_processing/lang-segment-anything
 RUN pip install torch torchvision
 RUN pip install -e .
 

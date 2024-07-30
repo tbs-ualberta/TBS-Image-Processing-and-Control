@@ -6,14 +6,14 @@ This file aims to document the setup of image recognition and depth mapping into
 
 The steps in this document were done with the following assumptions:
 
-- Operating system: Ubuntu 20.04.6 LTS
-- ROS version: Noetic
+- Operating system: Ubuntu 22
+- ROS version: Humble
 - Python version: 3.8.10
-- Camera: Xbox Kinect V2 (Xbox One)
+- Camera: ZED 2i
 
 # Install LangSAM
 
-First, the “language segment anything” (LangSAM) package needs to be installed. This can be done by following the instructions given here: https://github.com/luca-medeiros/lang-segment-anything.
+First, the “language segment anything” (LangSAM) package needs to be installed. This can be done by following the instructions given [here](https://github.com/luca-medeiros/lang-segment-anything).
 
 **Note:** this project cannot be run in a conda virtual environment; it needs to be run on the main python installation. This is because the dependencies of ROS, LangSAM and it’s dependencies have conflicting versions when installed in a conda environment. Therefore it is best to just install LangSAM into the main python environment using pip.
 
