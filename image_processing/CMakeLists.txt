@@ -1,46 +1,38 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5)
 project(image_processing)
 
-cmake_minimum_required(VERSION 3.10.2)
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+find_package(ament_cmake REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  rospy
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  message_generation
-  kinect_pub
+find_package(rosidl_default_generators REQUIRED)
+
+# Add message files
+set(msg_files
+  "msg/MaskArray.msg"
 )
 
-add_message_files(
-  FILES
-  MaskArray.msg
-  MaskData.msg
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  DEPENDENCIES std_msgs geometry_msgs
 )
 
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  kinect_pub
+install(
+  DIRECTORY
+    launch
+    config
+    resource
+    msg
+  DESTINATION share/${PROJECT_NAME}
 )
 
-catkin_package(
-  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs sensor_msgs kinect_pub
-)
+ament_python_install_package(${PROJECT_NAME})
 
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
-include_directories(
-# include
-  ${catkin_INCLUDE_DIRS}
-)
-
-catkin_install_python(PROGRAMS scripts/img_processor_node.py
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+ament_package()

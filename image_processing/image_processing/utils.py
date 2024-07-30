@@ -1,18 +1,16 @@
 # Authored by: Andor Siegers
 
-import rospy
+import rclpy
 from geometry_msgs.msg import Point
 from image_processing.msg import MaskArray, MaskData
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from scipy.ndimage import measurements, label
 import cv2
-from kinect_pub.msg import RegistrationData
-from kinect_pub.srv import GetCameraInfo
 from std_msgs.msg import Header
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, reg_data_msg):
+def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
@@ -30,7 +28,8 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
 
         mask_array.mask_data.append(temp_mask)
     # Add rgb image to array data
-    mask_array.registration_data = reg_data_msg
+    mask_array.rgb_image = bridge.cv2_to_imgmsg(rgb_image, encoding='bgr8')
+    mask_array.depth_image = bridge.cv2_to_imgmsg(depth_image, encoding='passthrough')
     return mask_array
 
 def unpack_MaskArray(mask_data):
@@ -44,6 +43,9 @@ def unpack_MaskArray(mask_data):
         logits = []
         avg_depths = []
         masks = []  # boolean arrays
+
+        rgb_image = bridge.imgmsg_to_cv2(mask_data.rgb_image, 'bgr8')
+        depth_image = bridge.imgmsg_to_cv2(mask_data.depth_image, desired_encoding='passthrough')
 
         # Convert data back to accessible data types
         for temp_mask in mask_data.mask_data:
@@ -63,121 +65,12 @@ def unpack_MaskArray(mask_data):
             avg_depths.append(temp_avg_depth)
             masks.append(mask_img)
 
-        return phrases, centroids, centroid_depths, logits, avg_depths, masks, mask_data.registration_data
+        return phrases, centroids, centroid_depths, logits, avg_depths, masks, rgb_image, depth_image
 
     except CvBridgeError as e:
-        rospy.logerr(f"CvBridge Error: {e}")
+        print(f"CvBridge Error: {e}")
     except Exception as e:
-        rospy.logerr(f"Error processing mask data: {e}")
-
-def unpack_RegistrationData(data):
-    # Unpacks registration data from custom message structure
-    bridge = CvBridge()
-    # Convert RGB Image
-    try:
-        rgb_image = bridge.imgmsg_to_cv2(data.rgb_image, "bgra8")
-        rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGRA2BGR)  # Convert to BGR
-    except Exception as e:
-        rospy.logerr("Error converting RGB image: %s", e)
-
-    # Convert Depth Image
-    try:
-        depth_image = bridge.imgmsg_to_cv2(data.depth_image, "32FC1")
-    except Exception as e:
-        rospy.logerr("Error converting Depth image: %s", e)
-
-    # Convert Undistorted Image
-    try:
-        undistorted_image = bridge.imgmsg_to_cv2(data.undistorted_image, "32FC1")
-    except Exception as e:
-        rospy.logerr("Error converting Undistorted image: %s", e)
-
-    # Convert Registered Image
-    try:
-        registered_image = bridge.imgmsg_to_cv2(data.registered_image, "bgra8")
-    except Exception as e:
-        rospy.logerr("Error converting Registered image: %s", e)
-
-    # Convert Bigdepth Image
-    try:
-        bigdepth_image = bridge.imgmsg_to_cv2(data.bigdepth_image, "32FC1")
-        bigdepth_image = np.array(bigdepth_image.data, dtype=np.float32).reshape((1082, 1920))
-    except Exception as e:
-        rospy.logerr("Error converting Bigdepth image: %s", e)
-
-    # Convert Colour Depth Map
-    try:
-        colour_depth_map = np.array(data.colour_depth_map, dtype=np.int32).reshape((424, 512))
-    except Exception as e:
-        rospy.logerr("Error converting Color Depth Map: %s", e)
-
-    # Convert Process Start Timestamp
-    try:
-        start_time = data.process_start_time
-    except Exception as e:
-        rospy.logerr("Error converting Color Depth Map: %s", e)
-
-    return rgb_image, depth_image, undistorted_image, registered_image, bigdepth_image, colour_depth_map, start_time
-
-def get_camera_parameters():
-    rospy.wait_for_service('/rgbd_out/get_camera_info')
-    try:
-        get_camera_info = rospy.ServiceProxy('/rgbd_out/get_camera_info', GetCameraInfo)
-        response = get_camera_info()
-        
-        # Construct the dictionary with depth camera parameters
-        depth_params = {
-            'cx': response.ir_cx,
-            'cy': response.ir_cy,
-            'fx': response.ir_fx,
-            'fy': response.ir_fy
-        }
-        
-        # Optional: Also get RGB camera parameters if needed
-        rgb_params = {
-            'cx': response.rgb_cx,
-            'cy': response.rgb_cy,
-            'fx': response.rgb_fx,
-            'fy': response.rgb_fy
-        }
-        
-        return depth_params, rgb_params
-    except rospy.ServiceException as e:
-        rospy.logerr("Service call failed: %s" % e)
-        return None, None
-
-def convert_to_matrices(camera_info): # This function is not used, but could be useful in the future
-    # Initialize intrinsic matrices
-    rgb_intrinsics = np.zeros((3,3))
-    depth_intrinsics = np.zeros((3,3))
-    rgb_dist_coeffs = np.zeros(5)
-    depth_dist_coeffs = np.zeros(5)
-    extrinsic_matrix = np.zeros((3,3))
-
-    if camera_info:
-        # Construct the intrinsic matrices
-        rgb_intrinsics = np.array([[camera_info.rgb_fx, 0, camera_info.rgb_cx],
-                                [0, camera_info.rgb_fy, camera_info.rgb_cy],
-                                [0, 0, 1]])
-        
-        depth_intrinsics = np.array([[camera_info.ir_fx, 0, camera_info.ir_cx],
-                                    [0, camera_info.ir_fy, camera_info.ir_cy],
-                                    [0, 0, 1]])
-        rgb_dist_coeffs = np.array([3.823e-3, 3.149e-4, 2.332e-4, -5.152e-4]) # from: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4701245/
-        depth_dist_coeffs = np.array([0.0893804, -0.272566, 0, 0, 0.0958438])
-        
-
-        # Construct extrinsic matrix
-        R = np.eye(3)  # Rotation matrix (3x3)
-        T = np.array([0, 0, 0])  # Translation vector (3x1)
-        extrinsic_matrix = np.eye(4)
-        extrinsic_matrix[:3, :3] = R
-        extrinsic_matrix[:3, 3] = T
-
-    else:
-        rospy.logwarn("Unable to get camera info. Intrinsic matrices are empty.")
-
-    return rgb_intrinsics, depth_intrinsics, rgb_dist_coeffs, depth_dist_coeffs, extrinsic_matrix
+        print(f"Error processing mask data: {e}")
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
 
@@ -233,14 +126,14 @@ def calculate_centroids(masks_np):
 
     return centroids_as_pixels
 
-def get_avg_depth(mask_np, bigdepth):
+def get_avg_depth(mask_np, registered_depth_img):
     # Convert boolean mask to list of coordinates
     coordinates = np.argwhere(mask_np)
 
     # Use coordinate list to find corresponding depth values
     depth_vals = []
     for y, x in coordinates:
-        px_depth = bigdepth[y+1, x]
+        px_depth = registered_depth_img[y+1, x]
         if px_depth != float('inf'):
             depth_vals.append(px_depth)
 

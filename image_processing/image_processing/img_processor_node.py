@@ -31,7 +31,9 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 from image_processing.msg import MaskArray
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import message_filters
 import os
 import sys
 import requests
@@ -41,7 +43,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__)))
 from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray, unpack_RegistrationData
 import warnings
 from transformers import logging
-from kinect_pub.msg import RegistrationData
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -65,11 +66,15 @@ class ImageProcessor(Node):
         # Define publisher for target position data
         self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
-        # Define subscribers for registration data (which includes rgb and depth images)
-        self.reg_sub = self.create_subscription(RegistrationData, 'rgbd_out/reg_data', self.callback, 10)
+        # Define subscribers for camera data (i.e. rgb and depth images)
+        self.left_rgb_sub = message_filters.Subscriber(self, Image, 'zed/zed_node/rgb/image_rect_color')  # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
+        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, 'zed/zed_node/depth/depth_registered')
 
-        # Initialize registration data message
-        self.reg_data = None
+        self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
+        self.ts.registerCallback(self.image_callback)
+
+        self.rgb_img = None
+        self.depth_img = None
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
@@ -87,9 +92,8 @@ class ImageProcessor(Node):
             # Save start time (to evaluate process time)
             process_time_start = self.get_clock().now()
 
-            prediction_reg_data = self.reg_data
-            # Unpack data from message data type
-            rgb_image, depth_image, undistorted_image, __, prediction_bigdepth_image, __, image_time = unpack_RegistrationData(prediction_reg_data)
+            rgb_image = self.rgb_img
+            depth_image = self.depth_img
 
             # For publishing mask and centroid data
             mask_array = MaskArray() 
@@ -117,17 +121,17 @@ class ImageProcessor(Node):
 
             # Find corresponding RGB values from pixel coordinates
             centroid_depths = []
-            centroid_depths = [prediction_bigdepth_image[y+1,x] for x, y in centroids_as_pixels]
+            centroid_depths = [depth_image[y+1,x] for x, y in centroids_as_pixels]
 
             # Find average depth value of each mask
             avg_depths = []
-            avg_depths = [get_avg_depth(mask, prediction_bigdepth_image) for mask in masks_np]
+            avg_depths = [get_avg_depth(mask, depth_image) for mask in masks_np]
 
             # Find target
             target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, prediction_reg_data)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -158,17 +162,15 @@ class ImageProcessor(Node):
                         print("-------------------------------------------------------------------------------------------------")
 
                 process_dif = self.get_clock().now() - process_time_start
-                image_dif = self.get_clock().now() - image_time
                 self.get_logger().info("Total processing time: %d.%09ds", process_dif.seconds, process_dif.nanoseconds)
-                self.get_logger().info("Total time since image taken: %d.%09ds", image_dif.seconds, image_dif.nanoseconds)
                 print("-------------------------------------------------------------------------------------------------")
 
         except (requests.exceptions.RequestException, IOError) as e:
             self.get_logger().error(f"Error: {e}")
 
-    def callback(self, reg_data):
-        # Unpack registration data
-        self.reg_data = reg_data
+    def image_callback(self, rgb_msg, depth_msg):
+        self.rgb_img = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
+        self.depth_img = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
 
     def cleanup(self):
         self.get_logger().info("Shutting down Image Processor Node")
