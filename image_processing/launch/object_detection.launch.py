@@ -14,7 +14,7 @@ def generate_launch_description():
         DeclareLaunchArgument('run_img_save', default_value='false', description='Run image save node'),
         DeclareLaunchArgument('run_mask_display', default_value='true', description='Run mask display node'),
 
-        # Always run Nodes
+        # Always run image processor
         Node(
             package='image_processing',
             executable='img_processor_node.py',
@@ -22,7 +22,7 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # Conditional Node definitions
+        # Conditional node definitions
         Node(
             condition=LaunchConfiguration('run_img_display'),
             package='image_processing',

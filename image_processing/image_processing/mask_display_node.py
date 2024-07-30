@@ -8,7 +8,7 @@ from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from utils import unpack_MaskArray, unpack_RegistrationData
+from utils import unpack_MaskArray
 import traceback
 
 DISPLAY_PHRASE = True       # Selects whether the phrase should be displayed along with the masked image

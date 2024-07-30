@@ -40,7 +40,7 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray, unpack_RegistrationData
+from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray
 import warnings
 from transformers import logging
 
