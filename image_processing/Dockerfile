@@ -1,4 +1,4 @@
-# Use an official ROS2 base image
+# Use an official PyTorch base image
 FROM pytorch/pytorch:latest
 
 # prevent apt from hanging
@@ -11,11 +11,11 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
 # Install ROS2 packages
-RUN apt-get update && apt-get upgrade -y \ 
-    && apt-get install ros-humble-ros-base -y
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y ros-humble-ros-base
 
-# Source setup script
-RUN . /opt/ros/humble/setup.sh
+# Source setup script (this line is redundant during the build process and should be used in runtime scripts)
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -23,11 +23,10 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-rosdep \
     ros-humble-cv-bridge \
-    # For lang-segment-anything
     git \
     libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set up the ROS2 workspace
 WORKDIR /root/ros_ws/src
@@ -49,16 +48,17 @@ RUN pip3 install --no-cache-dir \
 WORKDIR /root/ros_ws
 
 # Initialize rosdep and install dependencies
-RUN rosdep init \
-    && rosdep fix-permissions \
-    && rosdep update \
-    && rosdep install --from-paths src --ignore-src -r -y
+RUN rosdep init && \
+    rosdep fix-permissions && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -r -y
 
 # Build the ROS2 workspace
-RUN . /opt/ros/humble/setup.sh && colcon build
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"
 
 # Source the ROS2 setup script
-RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc \
-    && echo "source /ros_ws/install/setup.bash" >> ~/.bashrc
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
+    echo "source /root/ros_ws/install/setup.bash" >> ~/.bashrc
 
-RUN ros2 launch image_processing object_detection.launch.py
+# Launch image processing file
+CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection.launch.py"]

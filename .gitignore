@@ -10,11 +10,12 @@ venv/
 /build/
 
 # Ignore .vscode folder
-.vscode
+.vscode/
 
 # Ignore other repositories in this folder
 ros_kortex
 ros_gz
+/image_processing/lang-segment-anything/
 
 # CMakeLists
 /CMakeLists.txt
