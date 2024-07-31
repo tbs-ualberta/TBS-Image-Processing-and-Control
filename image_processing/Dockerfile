@@ -30,15 +30,21 @@ RUN pip3 install --no-cache-dir \
 # Source ROS setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 
-# Set up the ROS2 workspace
-WORKDIR /root/ros_ws/src
+# Clone lang-segment-anything from source
+WORKDIR /root
+# Official repository (currently broken)
+# RUN git clone https://github.com/luca-medeiros/lang-segment-anything
+# Fork with fix
+RUN git clone https://github.com/MistyDragon7/lang-segment-anything.git 
 
-# Copy ROS2 workspace into the container
-COPY . /root/ros_ws/src/Image-Processing-and-Control/image_processing
-
-# Install lang-segment-anything from source
-WORKDIR /root/ros_ws/src/Image-Processing-and-Control/image_processing/lang-segment-anything
+# Install lang-segment-anything
+WORKDIR /root/lang-segment-anything
 RUN pip install -e .
+
+# Install image_processing files
+WORKDIR /root/ros_ws/src
+RUN git clone
+
 
 WORKDIR /root/ros_ws
 
