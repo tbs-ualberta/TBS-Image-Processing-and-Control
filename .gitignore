@@ -16,6 +16,7 @@ venv/
 ros_kortex
 ros_gz
 /image_processing/lang-segment-anything/
+/image_processing/docker_resources
 
 # CMakeLists
 /CMakeLists.txt
