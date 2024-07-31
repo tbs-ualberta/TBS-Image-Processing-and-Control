@@ -43,8 +43,7 @@ RUN pip install -e .
 
 # Install image_processing files
 WORKDIR /root/ros_ws/src
-RUN git clone
-
+RUN git clone https://github.com/tbs-ualberta/WMM-Image-Processing-and-Control.git
 
 WORKDIR /root/ros_ws
 
@@ -65,4 +64,4 @@ RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
 RUN ls -R /root/ros_ws/install
 
 # Default command
-CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection.launch.py"]
+CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
