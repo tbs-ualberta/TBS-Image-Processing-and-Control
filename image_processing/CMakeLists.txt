@@ -9,11 +9,6 @@ find_package(std_msgs REQUIRED)
 
 find_package(rosidl_default_generators REQUIRED)
 
-# Add message files
-set(msg_files
-  "msg/MaskArray.msg"
-  "msg/MaskData.msg"
-)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
