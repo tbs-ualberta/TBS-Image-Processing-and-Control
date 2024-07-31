@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # Install ROS
 # # Install UTF-8 locale
-# RUN apt install locales \
+# RUN apt-get install locales \
 #     && locale-gen en_US en_US.UTF-8 \
 #     && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
 #     && export LANG=en_US.UTF-8
@@ -16,10 +16,10 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
     curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 # Install ROS2 packages # TODO change this
-RUN apt update && apt upgrade \ 
-    && apt install ros-humble-ros-base
+RUN apt-get update && apt-get upgrade -y \ 
+    && apt-get install ros-humble-ros-base -y
 # Source setup script
-RUN source /opt/ros/humble/setup.bash
+RUN . /opt/ros/humble/setup.sh
 
 # Set up the ROS2 workspace
 WORKDIR /ros_ws/src
@@ -40,9 +40,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install lang-segment-anything dependencies
-WORKDIR /ros_ws/src/Image-Processing-and-Control/image_processing/lang-segment-anything
-RUN pip install torch torchvision
-RUN pip install -e .
+# WORKDIR /ros_ws/src/Image-Processing-and-Control/image_processing/lang-segment-anything
+# RUN pip install -e .
+RUN pip install -U git+https://github.com/luca-medeiros/lang-segment-anything.git
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
