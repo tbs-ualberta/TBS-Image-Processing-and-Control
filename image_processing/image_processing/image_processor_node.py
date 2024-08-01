@@ -30,8 +30,8 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
-from image_processing.msg import MaskArray
 from sensor_msgs.msg import Image
+from process_msgs.msg import MaskArray
 from cv_bridge import CvBridge
 import message_filters
 import os
