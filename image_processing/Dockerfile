@@ -1,5 +1,5 @@
 # Use an official PyTorch base image
-FROM pytorch/pytorch:latest
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-devel
 
 # prevent apt from hanging
 ARG DEBIAN_FRONTEND=noninteractive
@@ -18,7 +18,8 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
     ros-humble-rosidl-default-generators \
     git \
     libgl1-mesa-glx \
-    libglib2.0-0 && \
+    libglib2.0-0 \
+    libstdc++6 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -27,7 +28,8 @@ RUN pip3 install --no-cache-dir \
     transformers==4.27.4 \
     huggingface-hub==0.16.4 \
     Pillow \
-    lark
+    lark \
+    colcon-common-extensions
 
 # Source ROS setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -54,8 +56,6 @@ RUN rosdep init && \
     rosdep fix-permissions && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
-
-RUN /opt/conda/bin/pip install --upgrade colcon-common-extensions
 
 # Build the ROS2 workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_cohesion+"
