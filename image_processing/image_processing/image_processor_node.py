@@ -12,12 +12,6 @@ PROCESSING_RATE = 1 # in Hz
 # The minimum confidence the model must have to use the object as a target
 TARGET_CONFIDENCE_THRESHOLD = 0.1
 
-# Select whether the output should be printed to the terminal or not
-PRINT_OUTPUT = False
-
-# Select whether the output should clear the console before outputting each cycle data
-CLEAR_OUTPUT = True
-
 # --------------------------------------------------------------------------------------------------------------------
 
 # -------------------------------------------- Calculated constants --------------------------------------------------
@@ -59,6 +53,12 @@ class ImageProcessor(Node):
 
         # Specifies target. This allows for detection of multiple objects but only targetting of one
         self.target = self.declare_parameter('target', 'person').get_parameter_value().string_value # must be contained in the prompt
+        
+        # Specifies whether to print the output to the terminal or not
+        self.print_output = self.declare_parameter('print_output', True).get_parameter_value().bool_value
+
+        # Select whether the output should clear the console before outputting each cycle data
+        self.clear_output = self.declare_parameter('clear_output', True).get_parameter_value().bool_value
         
         # Define publisher for mask data
         self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
@@ -139,7 +139,7 @@ class ImageProcessor(Node):
             # Publish mask data
             self.mask_pub.publish(mask_array)
 
-            if PRINT_OUTPUT:
+            if self.print_output:
                 # Clear the console for new output
                 if CLEAR_OUTPUT:
                     os.system('clear')

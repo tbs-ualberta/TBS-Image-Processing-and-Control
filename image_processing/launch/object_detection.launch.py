@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
@@ -9,6 +9,8 @@ def generate_launch_description():
         # Declare parameters
         DeclareLaunchArgument('prompt', default_value='person.phone', description='Prompt parameter'),
         DeclareLaunchArgument('target', default_value='person', description='Target parameter'),
+        DeclareLaunchArgument('print_output', default_value=True, description='print_output parameter'),
+        DeclareLaunchArgument('clear_output', default_value=True, description='clear_output parameter'),
 
         # Declare arguments to enable or disable nodes
         DeclareLaunchArgument('run_img_display', default_value='false', description='Run image display node'),
