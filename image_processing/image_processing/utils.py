@@ -2,7 +2,7 @@
 
 import rclpy
 from geometry_msgs.msg import Point
-from image_processing.msg import MaskArray, MaskData
+from process_msgs.msg import MaskArray, MaskData
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 from scipy.ndimage import measurements, label

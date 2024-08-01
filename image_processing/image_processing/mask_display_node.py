@@ -3,12 +3,12 @@
 
 import rclpy
 from rclpy.node import Node
-from image_processing.msg import MaskArray
 from sensor_msgs.msg import Image
+from process_msgs.msg import MaskArray
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from utils import unpack_MaskArray
+from image_processing.utils import unpack_MaskArray
 import traceback
 
 DISPLAY_PHRASE = True       # Selects whether the phrase should be displayed along with the masked image

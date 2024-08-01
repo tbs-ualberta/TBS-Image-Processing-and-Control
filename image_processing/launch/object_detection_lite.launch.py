@@ -11,7 +11,7 @@ def generate_launch_description():
 
         Node(
             package='image_processing',
-            executable='img_processor_node.py',
+            executable='image_processor',
             name='img_processor_node',
             output='screen'
         )

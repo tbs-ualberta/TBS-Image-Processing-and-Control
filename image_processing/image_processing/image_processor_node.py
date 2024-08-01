@@ -85,7 +85,7 @@ class ImageProcessor(Node):
         self.get_logger().info("Image Processor Node Started")
 
     def process_images(self):
-        if self.reg_data is None:
+        if self.rgb_img is None or self.depth_img is None:
             return
         
         try:
