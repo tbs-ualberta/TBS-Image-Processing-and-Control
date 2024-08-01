@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
     python3-pip \
     python3-rosdep \
     ros-humble-cv-bridge \
+    ros-humble-rosidl-default-generators \
     git \
     libgl1-mesa-glx \
     libglib2.0-0 && \
@@ -25,7 +26,8 @@ RUN pip3 install --no-cache-dir \
     requests \
     transformers==4.27.4 \
     huggingface-hub==0.16.4 \
-    Pillow
+    Pillow \
+    lark
 
 # Source ROS setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -42,7 +44,7 @@ WORKDIR /root/lang-segment-anything
 RUN pip install -e .
 
 # Install image_processing files
-WORKDIR /root/ros_ws/src
+WORKDIR /root/ros_ws/src/
 RUN git clone https://github.com/tbs-ualberta/WMM-Image-Processing-and-Control.git
 
 WORKDIR /root/ros_ws
@@ -53,15 +55,14 @@ RUN rosdep init && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
 
+RUN /opt/conda/bin/pip install --upgrade colcon-common-extensions
+
 # Build the ROS2 workspace
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_cohesion+"
 
 # Source the ROS2 setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
     echo "source /root/ros_ws/install/setup.bash" >> ~/.bashrc
-
-# Debugging step: List the contents of the install directory
-RUN ls -R /root/ros_ws/install
 
 # Default command
 CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
