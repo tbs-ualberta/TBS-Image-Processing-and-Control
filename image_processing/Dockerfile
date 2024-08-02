@@ -1,5 +1,5 @@
 # Use an official PyTorch base image
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-devel
+FROM pytorch/pytorch:latest
 
 # prevent apt from hanging
 ARG DEBIAN_FRONTEND=noninteractive
@@ -25,9 +25,6 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
     requests \
-    transformers==4.27.4 \
-    huggingface-hub==0.16.4 \
-    Pillow \
     lark \
     colcon-common-extensions
 
@@ -36,10 +33,8 @@ RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 
 # Clone lang-segment-anything from source
 WORKDIR /root
-# Official repository (currently broken)
-# RUN git clone https://github.com/luca-medeiros/lang-segment-anything
-# Fork with fix
-RUN git clone https://github.com/MistyDragon7/lang-segment-anything.git 
+# Official repository
+RUN git clone https://github.com/luca-medeiros/lang-segment-anything
 
 # Install lang-segment-anything
 WORKDIR /root/lang-segment-anything

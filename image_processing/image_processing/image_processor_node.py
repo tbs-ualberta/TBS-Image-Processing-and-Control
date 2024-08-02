@@ -1,6 +1,5 @@
 # Authored by: Andor Siegers
 
-# using transformers-4.27.4 and huggingface-hub-0.16.4
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues when tested
 
 # -------------------------------------------- User defined constants ------------------------------------------------
@@ -48,17 +47,23 @@ class ImageProcessor(Node):
         super().__init__('image_processor')
         self.bridge = CvBridge()
 
-        # This specifies the prompt which the model masks
-        self.prompt = self.declare_parameter('prompt', 'person.chair').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
+        # Specifies the prompt which the model masks
+        self.prompt = self.declare_parameter('prompt').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
 
         # Specifies target. This allows for detection of multiple objects but only targetting of one
-        self.target = self.declare_parameter('target', 'person').get_parameter_value().string_value # must be contained in the prompt
+        self.target = self.declare_parameter('target').get_parameter_value().string_value # must be contained in the prompt
         
         # Specifies whether to print the output to the terminal or not
-        self.print_output = self.declare_parameter('print_output', True).get_parameter_value().bool_value
+        self.PRINT_OUTPUT = self.declare_parameter('print_output').get_parameter_value().string_value.lower() == 'true'
 
-        # Select whether the output should clear the console before outputting each cycle data
-        self.clear_output = self.declare_parameter('clear_output', True).get_parameter_value().bool_value
+        # Specifies whether the output should clear the console before outputting each cycle data
+        self.CLEAR_OUTPUT = self.declare_parameter('clear_output').get_parameter_value().string_value.lower() == 'true'
+
+        # Specifies RGB image topic name
+        self.rgb_img_topic = self.declare_parameter('rgb_img_topic', ).get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
+
+        # Specifies Depth image topic name
+        self.depth_img_topic = self.declare_parameter('depth_img_topic').get_parameter_value().string_value
         
         # Define publisher for mask data
         self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
@@ -67,8 +72,8 @@ class ImageProcessor(Node):
         self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
         # Define subscribers for camera data (i.e. rgb and depth images)
-        self.left_rgb_sub = message_filters.Subscriber(self, Image, 'zed/zed_node/rgb/image_rect_color')  # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
-        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, 'zed/zed_node/depth/depth_registered')
+        self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_img_topic)
+        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, self.depth_img_topic)
 
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
@@ -139,9 +144,9 @@ class ImageProcessor(Node):
             # Publish mask data
             self.mask_pub.publish(mask_array)
 
-            if self.print_output:
+            if self.PRINT_OUTPUT:
                 # Clear the console for new output
-                if CLEAR_OUTPUT:
+                if self.CLEAR_OUTPUT:
                     os.system('clear')
 
                 # Print data to console

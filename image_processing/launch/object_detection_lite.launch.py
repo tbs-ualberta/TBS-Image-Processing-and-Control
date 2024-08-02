@@ -5,10 +5,12 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         # Declare parameters
-        DeclareLaunchArgument('prompt', default_value='person.phone', description='Prompt parameter'),
-        DeclareLaunchArgument('target', default_value='person', description='Target parameter'),
-        DeclareLaunchArgument('print_output', default_value=True, description='print_output parameter'),
-        DeclareLaunchArgument('clear_output', default_value=True, description='clear_output parameter'),
+        DeclareLaunchArgument('prompt', default_value='person.phone', description='Prompt parameter (multiple objects can be detected using a \'.\' as a separator)'),
+        DeclareLaunchArgument('target', default_value='person', description='Target parameter (must be contained in the prompt)'),
+        DeclareLaunchArgument('print_output', default_value='true', description='print_output parameter'),
+        DeclareLaunchArgument('clear_output', default_value='true', description='clear_output parameter'),
+        DeclareLaunchArgument('rgb_img_topic', default_value='zed/zed_node/rgb/image_rect_color', description='topic for rgb image publishing'),
+        DeclareLaunchArgument('depth_img_topic', default_value='zed/zed_node/depth/depth_registered', description='topic for registered depth image publishing'),
 
         Node(
             package='image_processing',

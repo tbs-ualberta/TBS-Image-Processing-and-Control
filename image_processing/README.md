@@ -19,7 +19,7 @@ First, the “language segment anything” (LangSAM) package needs to be install
 
 # Image Display Program
 
-“img_display_node.py” simply displays the raw images output by the C++ publisher program. This is helpful for debugging and developing new programs, as it is taken directly from the camera without any processing.
+“img_display_node.py” simply displays the raw images output by the camera. This is helpful for debugging and developing new programs, as it is taken directly from the camera without any further processing.
 
 # Image Saving Program
 
@@ -29,7 +29,7 @@ First, the “language segment anything” (LangSAM) package needs to be install
 
 # Image Processing Program
 
-"img_processor_node.py" processes the images received from the Kinect and sends the coordinates of the specified target to the WMM control program. It feeds the raw images to an image recognition model along with a prompt. This then calculates a mask over the image for each tracked object, which it then finds the centerpoint of, essentially finding the location of the centroid of each object. It then uses the depth data taken from the camera to calculate the depth value of the centroid of each tracked object, along with the average depth over the entire object. It publishes all this data to a ROS topic using a custom msg structure. The program then compares the calculated masks with the given target phrase, and sends the x (px), y (px), and depth (mm) coordinates of the target centroid to another ROS topic. If two or more targets are detected, the program sends the coordinates of the closest centroid (Note: this can be changed if a different, more complex targeting algorithm is desired).
+"img_processor_node.py" processes the images received from the Kinect and publishes the coordinates of the specified target to a ROS topic. It feeds the raw images to an image recognition model along with a prompt. This then calculates a mask over the image for each tracked object, which it then finds the centerpoint of, essentially finding the location of the centroid of each object. It then uses the depth data taken from the camera to calculate the depth value of the centroid of each tracked object, along with the average depth over the entire object. It publishes all this data to a ROS topic using a custom msg structure. The program then compares the calculated masks with the given target phrase, and sends the x (px), y (px), and depth (mm) coordinates of the target centroid to another ROS topic. If two or more targets are detected, the program sends the coordinates of the closest centroid (Note: this can be changed if a different, more complex targeting algorithm is desired).
 
 **Note:** changing the PROMPT constant will change what the image recognition model will detect. This can be utilized to detect multiple objects in the image. The TARGET constant should contain only one object phrase, and must be contained within the prompt. This allows for detection of multiple objects, the program sends the information of only one target to the robot control algorithm. This could be modified in the future to potentially support obstacle detection.
 
