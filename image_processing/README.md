@@ -51,3 +51,14 @@ A few notes about using this package:
 - The mask display and obstacle avoidance programs rely on data published by the processing program, so should only be run after the processing program has started.
 
 **Note:** for easiest operation, use the launch files provided in the "launch" directory. Some of these also have parameters which can be changed to change their behaviours. For more information see the launch files.
+
+# For Remote Development using VSCode
+1. Install Remote Development extensions:
+- Remote - SSH
+- Remote - Containers
+2. Set up Remote -SSH in VSCode
+    1. Open VSCode.
+    2. Press Ctrl+Shift+P to open the Command Palette.
+    3. Type "Remote-SSH: Connect to Host..." and select it.
+    4. Enter the SSH connection string for your Jetson Orin AGX (e.g., your_username@jetson_ip_address).
+3. Open a remote folder by clicking the Explorer icon on the sidebar and selecting "Open Folder", then browsing to the desired folder on the Jetson.
