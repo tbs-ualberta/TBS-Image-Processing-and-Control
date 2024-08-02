@@ -1,16 +1,22 @@
-# Use an official PyTorch base image
-FROM pytorch/pytorch:latest
+# Use an NVIDIA L4T base image for ARM
+FROM nvcr.io/nvidia/l4t-base:r32.7.1
 
-# prevent apt from hanging
+# Set environment variable to prevent apt from hanging
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Get ROS2 key and install ROS2 packages and dependencies
-RUN apt-get update && apt-get install -y software-properties-common curl && \
-    add-apt-repository universe && \
-    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
-    apt-get update && apt-get upgrade -y && \
-    apt-get install -y ros-humble-ros-base \
+# Install ROS2 dependencies
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    curl \
+    gnupg \
+    lsb-release \
+    && add-apt-repository universe \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y \
+    ros-humble-ros-base \
     python3-colcon-common-extensions \
     python3-pip \
     python3-rosdep \
@@ -19,8 +25,13 @@ RUN apt-get update && apt-get install -y software-properties-common curl && \
     git \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    libstdc++6 && \
-    rm -rf /var/lib/apt/lists/*
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch and torchvision for ARM architecture
+RUN pip3 install --no-cache-dir \
+    torch==2.0.1+cpu torchvision==0.15.2+cpu \
+    -f https://download.pytorch.org/whl/armv7l/torch_stable.html
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
@@ -40,7 +51,7 @@ RUN git clone https://github.com/luca-medeiros/lang-segment-anything
 WORKDIR /root/lang-segment-anything
 RUN pip install -e .
 
-# Install image_processing files
+# Clone and install image_processing files
 WORKDIR /root/ros_ws/src/
 RUN git clone https://github.com/tbs-ualberta/WMM-Image-Processing-and-Control.git
 
