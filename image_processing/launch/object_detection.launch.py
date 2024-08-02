@@ -24,7 +24,15 @@ def generate_launch_description():
             package='image_processing',
             executable='image_processor',
             name='img_processor_node',
-            output='screen'
+            output='screen',
+            parameters=[
+                {'prompt': LaunchConfiguration('prompt')},
+                {'target': LaunchConfiguration('target')},
+                {'print_output': LaunchConfiguration('print_output')},
+                {'clear_output': LaunchConfiguration('clear_output')},
+                {'rgb_img_topic': LaunchConfiguration('rgb_img_topic')},
+                {'depth_img_topic': LaunchConfiguration('depth_img_topic')}
+            ]
         ),
 
         # Conditional node definitions

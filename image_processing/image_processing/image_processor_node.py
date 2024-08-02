@@ -48,22 +48,32 @@ class ImageProcessor(Node):
         self.bridge = CvBridge()
 
         # Specifies the prompt which the model masks
-        self.prompt = self.declare_parameter('prompt').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
+        self.prompt = self.declare_parameter('prompt', 'person').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
 
         # Specifies target. This allows for detection of multiple objects but only targetting of one
-        self.target = self.declare_parameter('target').get_parameter_value().string_value # must be contained in the prompt
+        self.target = self.declare_parameter('target', 'person').get_parameter_value().string_value # must be contained in the prompt
         
         # Specifies whether to print the output to the terminal or not
-        self.PRINT_OUTPUT = self.declare_parameter('print_output').get_parameter_value().string_value.lower() == 'true'
+        self.PRINT_OUTPUT = self.declare_parameter('print_output', 'false').get_parameter_value().string_value
+        self.PRINT_OUTPUT = (self.PRINT_OUTPUT.lower() == 'true')
 
         # Specifies whether the output should clear the console before outputting each cycle data
-        self.CLEAR_OUTPUT = self.declare_parameter('clear_output').get_parameter_value().string_value.lower() == 'true'
+        self.CLEAR_OUTPUT = self.declare_parameter('clear_output', 'true').get_parameter_value().string_value
+        self.CLEAR_OUTPUT = (self.CLEAR_OUTPUT.lower() == 'true')
 
         # Specifies RGB image topic name
-        self.rgb_img_topic = self.declare_parameter('rgb_img_topic', ).get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
+        self.rgb_img_topic = self.declare_parameter('rgb_img_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
 
         # Specifies Depth image topic name
-        self.depth_img_topic = self.declare_parameter('depth_img_topic').get_parameter_value().string_value
+        self.depth_img_topic = self.declare_parameter('depth_img_topic', 'zed/zed_node/depth/depth_registered').get_parameter_value().string_value
+
+        # Debug: print the parameters to verify
+        self.get_logger().info(f'prompt: {self.prompt}')
+        self.get_logger().info(f'target: {self.target}')
+        self.get_logger().info(f'print_output: {self.PRINT_OUTPUT}')
+        self.get_logger().info(f'clear_output: {self.CLEAR_OUTPUT}')
+        self.get_logger().info(f'rgb image topic: {self.rgb_img_topic}')
+        self.get_logger().info(f'depth image topic: {self.depth_img_topic}')
         
         # Define publisher for mask data
         self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
