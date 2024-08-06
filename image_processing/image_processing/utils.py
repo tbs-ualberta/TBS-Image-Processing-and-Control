@@ -223,9 +223,9 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
     # Find minimum depth of nearest target
-    target_x = -1
-    target_y = -1
-    target_depth = -1 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
+    target_x = -1.0
+    target_y = -1.0
+    target_depth = -1.0 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
     min_depth = float('inf')
     for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, object_depths, logits):
         if target_phrase in temp_phrase and temp_depth < min_depth and temp_logit > target_confidence_threshold:
@@ -233,7 +233,7 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
             target_y = temp_centroid[1]
             target_depth = temp_depth
             min_depth = temp_depth
-    target = Point(target_x, target_y, target_depth) # Note: z in value is in mm, while x and y are in px
+    target = Point(x=target_x, y=target_y, z=target_depth) # Note: z in value is in mm, while x and y are in px
     return target
 # -------------------------------------------------- Target finding -------------------------------------------------------
 

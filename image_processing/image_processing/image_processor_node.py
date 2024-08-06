@@ -42,6 +42,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 logging.set_verbosity_error()
 
+import torch
+print(torch.__version__)
+print(torch.cuda.is_available())
+
 class ImageProcessor(Node):
     def __init__(self):
         super().__init__('image_processor')
@@ -125,7 +129,7 @@ class ImageProcessor(Node):
             masks, boxes, phrases, logits = self.model.predict(image_pil, self.prompt)
 
             # Initialize target values
-            target_pos = Point(x=-1,y=-1,z=-1)
+            target_pos = Point(x=-1.0,y=-1.0,z=-1.0)
 
             # Convert masks to numpy arrays
             masks_np = [mask.squeeze().cpu().numpy() for mask in masks]
@@ -186,6 +190,7 @@ class ImageProcessor(Node):
     def image_callback(self, rgb_msg, depth_msg):
         self.rgb_img = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
         self.depth_img = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
+        # self.get_logger().info("Image received!")
 
     def cleanup(self):
         self.get_logger().info("Shutting down Image Processor Node")

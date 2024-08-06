@@ -62,3 +62,6 @@ A few notes about using this package:
     3. Type "Remote-SSH: Connect to Host..." and select it.
     4. Enter the SSH connection string for your Jetson Orin AGX (e.g., your_username@jetson_ip_address).
 3. Open a remote folder by clicking the Explorer icon on the sidebar and selecting "Open Folder", then browsing to the desired folder on the Jetson.
+
+# Docker
+This project can be built inside of a Docker container using the included Dockerfile. This Dockerfile builds off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository.
