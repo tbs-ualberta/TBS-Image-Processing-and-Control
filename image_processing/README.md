@@ -64,4 +64,4 @@ A few notes about using this package:
 3. Open a remote folder by clicking the Explorer icon on the sidebar and selecting "Open Folder", then browsing to the desired folder on the Jetson.
 
 # Docker
-This project can be built inside of a Docker container using the included Dockerfile. This Dockerfile builds off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository.
+This project can be built inside of a Docker container using the included Dockerfile. This Dockerfile builds off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository. To build the Dockerfile on x86 architecture, [this](https://www.stereolabs.com/docs/docker/building-arm-container-on-x86) guide is helpful.
