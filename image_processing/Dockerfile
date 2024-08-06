@@ -1,5 +1,5 @@
 # Use a PyTorch image built specifically for Jetson from https://github.com/dusty-nv/jetson-containers
-FROM dustynv/sam:r36.2.0
+FROM torch_ros:r36.3.0-opencv_deb
 
 # Set environment variable to prevent apt from hanging
 ARG DEBIAN_FRONTEND=noninteractive
