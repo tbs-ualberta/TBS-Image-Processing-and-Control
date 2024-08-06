@@ -117,8 +117,8 @@ class MaskDisplay(Node):
 def main(args=None):
     rclpy.init(args=args)
     try:
-        image_saver_processor = MaskDisplay()
-        image_saver_processor.spin()
+        mask_display = MaskDisplay()
+        mask_display.spin()
     except KeyboardInterrupt:
         pass
     finally:

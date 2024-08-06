@@ -52,7 +52,7 @@ import imageio
 
 class ImageSaver(Node):
     def __init__(self):
-        super().__init__('img_saver')
+        super().__init__('image_saver')
         self.bridge = CvBridge()
 
         # Clear the save directory

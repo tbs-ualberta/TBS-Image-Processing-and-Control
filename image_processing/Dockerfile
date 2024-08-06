@@ -22,12 +22,14 @@ RUN apt-get install -y \
     ros-humble-cv-bridge \
     ros-humble-rosidl-default-generators \
     python3-colcon-common-extensions \
+    python3-rosdep
+
+# Install other packages
+RUN apt-get install -y \
     python3-pip \
-    python3-rosdep \
     git \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
