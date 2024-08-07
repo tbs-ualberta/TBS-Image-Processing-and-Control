@@ -30,23 +30,5 @@ RUN git clone https://github.com/luca-medeiros/lang-segment-anything
 WORKDIR /root/lang-segment-anything
 RUN pip install -e .
 
-# Clone and install image_processing files
-WORKDIR /root/ros_ws/src/
-RUN git clone https://github.com/tbs-ualberta/WMM-Image-Processing-and-Control.git
-
-WORKDIR /root/ros_ws
-
-# Initialize rosdep and install dependencies
-RUN rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y
-
-# Build the ROS2 workspace
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_cohesion+"
-
-# Source the ROS2 setup script
-RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
-    echo "source /root/ros_ws/install/setup.bash" >> ~/.bashrc && \
-    echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
-
 # Default command
 CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
