@@ -21,8 +21,8 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
         temp_mask.centroid = Point(x=float(centroid[0]), y=float(centroid[1]), z=float(depth_val)) # the z part of the point is depth (in mm)
                                                                         # this should not be confused for a point in
                                                                         # 3d cartesian space, as x and y are in px
-        temp_mask.logit = logit
-        temp_mask.avg_depth = avg_depth
+        temp_mask.logit = float(logit)
+        temp_mask.avg_depth = float(avg_depth)
         mask_image = (mask * 255).astype(np.uint8)
         temp_mask.mask = bridge.cv2_to_imgmsg(mask_image, encoding="mono8") 
 
