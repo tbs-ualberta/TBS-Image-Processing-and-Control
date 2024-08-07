@@ -65,3 +65,8 @@ A few notes about using this package:
 
 # Docker
 This project can be built inside of a Docker container using the included Dockerfile. This Dockerfile builds off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository. To build the Dockerfile on x86 architecture, [this](https://www.stereolabs.com/docs/docker/building-arm-container-on-x86) guide is helpful.
+
+To run the container and ensure it is connected to the other ROS2 nodes running on the system (either in other containers or natively) run the following:
+```bash
+docker run -it --network="host" image_processing:latest
+```
