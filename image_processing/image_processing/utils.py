@@ -18,7 +18,7 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
         temp_mask = MaskData()
         temp_mask.header = Header()
         temp_mask.phrase = phrase
-        temp_mask.centroid = Point(x=centroid[0], y=centroid[1], z=depth_val) # the z part of the point is depth (in mm)
+        temp_mask.centroid = Point(x=float(centroid[0]), y=float(centroid[1]), z=float(depth_val)) # the z part of the point is depth (in mm)
                                                                         # this should not be confused for a point in
                                                                         # 3d cartesian space, as x and y are in px
         temp_mask.logit = logit

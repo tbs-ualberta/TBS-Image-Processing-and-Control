@@ -11,7 +11,7 @@ RUN rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
 
 # Build the ROS2 workspace
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers console_cohesion+"
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --event-handlers --symlink-install console_cohesion+"
 
 # Source the ROS2 setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
