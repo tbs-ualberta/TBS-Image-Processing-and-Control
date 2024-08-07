@@ -183,7 +183,8 @@ class ImageProcessor(Node):
 
                 process_dif = self.get_clock().now() - process_time_start
                 process_dif_secs = process_dif.nanoseconds / 1e9
-                self.get_logger().info("Total processing time: %d.%09ds", process_dif_secs, process_dif.nanoseconds)
+                log_string = str("Total processing time: %d.%09ds", process_dif_secs, process_dif.nanoseconds)
+                self.get_logger().info(log_string)
                 print("-------------------------------------------------------------------------------------------------")
 
         except (requests.exceptions.RequestException, IOError) as e:
