@@ -36,6 +36,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__)))
 from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray
 import warnings
 from transformers import logging
+from rclpy.duration import Duration
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -181,7 +182,8 @@ class ImageProcessor(Node):
                         print("-------------------------------------------------------------------------------------------------")
 
                 process_dif = self.get_clock().now() - process_time_start
-                self.get_logger().info("Total processing time: %d.%09ds", process_dif.seconds, process_dif.nanoseconds)
+                process_dif_secs = process_dif.nanoseconds / 1e9
+                self.get_logger().info("Total processing time: %d.%09ds", process_dif_secs, process_dif.nanoseconds)
                 print("-------------------------------------------------------------------------------------------------")
 
         except (requests.exceptions.RequestException, IOError) as e:

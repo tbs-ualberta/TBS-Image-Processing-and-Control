@@ -1,4 +1,4 @@
-FROM image_processing_base:latest
+FROM andors/image_processing_base:latest
 
 # Clone and install image_processing files
 WORKDIR /root/ros_ws/src
