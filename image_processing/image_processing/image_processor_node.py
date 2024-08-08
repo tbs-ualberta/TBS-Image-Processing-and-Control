@@ -182,8 +182,8 @@ class ImageProcessor(Node):
                         print("-------------------------------------------------------------------------------------------------")
 
                 process_dif = self.get_clock().now() - process_time_start
-                process_dif_secs = process_dif.nanoseconds / 1e9
-                log_string = str("Total processing time: %d.%09ds", process_dif_secs, process_dif.nanoseconds)
+                total_seconds = process_dif.nanoseconds / 1e9
+                log_string = str(f"Total processing time: {total_seconds:.9f} s")
                 self.get_logger().info(log_string)
                 print("-------------------------------------------------------------------------------------------------")
 

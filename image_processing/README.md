@@ -77,5 +77,5 @@ The first line in Dockerfile.upper can then be replaced with: ```FROM image_proc
 
 To run the container and ensure it is connected to the other ROS2 nodes running on the system (either in other containers or natively) run the following:
 ```bash
-docker run -it -v /home/indro/ranger_mini_ws/src/image_processing_and_control:/root/ros_ws/src --network="host" image_processing:latest
+docker run -it --network="host" image_processing:latest
 ```

@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     python3-rosdep \
     ros-humble-ros-base \
     ros-humble-ament-cmake \
+    ros-humble-ament-cmake-python \
     ros-humble-rclpy \
     ros-humble-geometry-msgs \
     ros-humble-sensor-msgs \
@@ -17,7 +18,8 @@ RUN apt-get update && apt-get install -y \
     ros-humble-std-msgs \
     ros-humble-rosidl-default-runtime \
     ros-humble-ament-lint-auto \
-    ros-humble-rmw-cyclonedds-cpp
+    ros-humble-rmw-cyclonedds-cpp \
+    ros-dev-tools
 
 # Source ROS setup script
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -31,4 +33,4 @@ WORKDIR /root/lang-segment-anything
 RUN pip install -e .
 
 # Default command
-CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
+CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash"]
