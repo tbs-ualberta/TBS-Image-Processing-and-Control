@@ -46,8 +46,7 @@ First, the “language segment anything” (LangSAM) package needs to be install
 
 A few notes about using this package:
 
-- Every program in this package relies on the output of the C++ program defined in the kinect_pub package, which reads in data from the Xbox Kinect V2 and publishes it to various ROS topics.
-- The image display, saving, and processing programs can be run once the above described C++ program is running, as they only rely on data published by that program.
+- The Dockerfiles in this package were written to run on a Nvidia Jetson Orin AGX. This means they build on ARM architecture (not x86). For more details on how to build (including how to build using an x86 machine), see the Docker section below.
 - The mask display and obstacle avoidance programs rely on data published by the processing program, so should only be run after the processing program has started.
 
 **Note:** for easiest operation, use the launch files provided in the "launch" directory. Some of these also have parameters which can be changed to change their behaviours. For more information see the launch files.
@@ -64,9 +63,19 @@ A few notes about using this package:
 3. Open a remote folder by clicking the Explorer icon on the sidebar and selecting "Open Folder", then browsing to the desired folder on the Jetson.
 
 # Docker
-This project can be built inside of a Docker container using the included Dockerfile. This Dockerfile builds off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository. To build the Dockerfile on x86 architecture, [this](https://www.stereolabs.com/docs/docker/building-arm-container-on-x86) guide is helpful.
+This project can be built inside of a Docker container using the included Dockerfiles. These Dockerfiles build off an image created by Dustin Franklin and documented in [this](https://github.com/dusty-nv/jetson-containers) repository. There are multiple Dockerfiles to improve modularity and speed up development. It should be possible to simply build Dockerfile.upper immediately, as a working image of Dockerfile.base is available on Docker Hub:
+```bash
+docker build -f Dockerfile.upper -t image_processing:latest .
+```
+However, if for whatever reason the Docker Hub image is not working, you can try building locally using Dockerfile.base:
+```bash
+docker build -f Dockerfile.base -t image_processing_base:latest .
+```
+The first line in Dockerfile.upper can then be replaced with: ```FROM image_processing_base:latest```
+
+**Note:** To build the Dockerfiles on x86 architecture, [this](https://www.stereolabs.com/docs/docker/building-arm-container-on-x86) guide is helpful.
 
 To run the container and ensure it is connected to the other ROS2 nodes running on the system (either in other containers or natively) run the following:
 ```bash
-docker run -it --network="host" image_processing:latest
+docker run -it -v /home/indro/ranger_mini_ws/src/image_processing_and_control:/root/ros_ws/src --network="host" image_processing:latest
 ```
