@@ -26,7 +26,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from process_msgs.msg import MaskArray
 from cv_bridge import CvBridge
 import message_filters
@@ -36,7 +36,7 @@ import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from utils import calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray
+from utils import CameraParams, calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray, get_point_xyz
 import warnings
 from transformers import logging
 from rclpy.duration import Duration
@@ -93,6 +93,7 @@ class ImageProcessor(Node):
         # Define subscribers for camera data (i.e. rgb and depth images and camera info)
         self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_image_topic)
         self.left_depth_reg_sub = message_filters.Subscriber(self, Image, self.depth_img_topic)
+        self.cam_info_sub = self.create_subscription(CameraInfo,' /zed/zed_node/depth/camera_info', self.cam_info_callback)
 
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
@@ -100,6 +101,7 @@ class ImageProcessor(Node):
         self.rgb_image = None
         self.depth_image = None
         self.depth_array = None
+        self.camera_params = CameraParams()
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
@@ -148,21 +150,20 @@ class ImageProcessor(Node):
             centroids_as_pixels = []
             centroids_as_pixels = calculate_centroids(masks_np)
 
-            # Find corresponding RGB values from pixel coordinates
-            centroid_depths = []
-            centroid_depths = [depth_array[y,x] for x, y in centroids_as_pixels]
-            print("Centroid depths: " + str(centroid_depths))
+            # Find each centroid's point in 3D space TODO
+            centroids_cartesian = []
+            for centroid_as_px in centroids_as_pixels:
+                centroids_cartesian = get_point_xyz(centroid_as_px, depth_array, self.camera_params)
 
             # Find average depth value of each mask
             avg_depths = []
             avg_depths = [get_avg_depth(mask, depth_array) for mask in masks_np]
-            print("Average depths: " + str(avg_depths))
 
             # Find target
             target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -211,6 +212,17 @@ class ImageProcessor(Node):
 
         if not REGULATE_PROCESS_RATE:
             self.process_images()
+    
+    def cam_info_callback(self, cam_info_msg:CameraInfo):
+        self.camera_params.height = cam_info_msg.height
+        self.camera_params.width = cam_info_msg.width
+        instrinsic_matrix = cam_info_msg.p
+        self.camera_params.fx = instrinsic_matrix[0][0]
+        self.camera_params.fy = instrinsic_matrix[1][1]
+        self.camera_params.cx = instrinsic_matrix[0][2]
+        self.camera_params.cy = instrinsic_matrix[1][2]
+
+        self._subscriptions.remove(self.cam_info_sub)
 
     def cleanup(self):
         self.get_logger().info("Shutting down Image Processor Node")

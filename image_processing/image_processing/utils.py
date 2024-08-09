@@ -10,18 +10,28 @@ import cv2
 from std_msgs.msg import Header
 import math
 
+# ---------------------------------------------- Custom Class Definitions -------------------------------------------------
+class CameraParams():
+    def __init__(self):
+        self.height = None
+        self.width = None
+        self.fx = None
+        self.fy = None
+        self.cx = None
+        self.cy = None
+# -------------------------------------------------------------------------------------------------------------------------
+
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
+def convert_to_MaskArray(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
-    for centroid, depth_val, phrase, logit, avg_depth, mask in zip(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np):
+    for centroid_px, centroid, phrase, logit, avg_depth, mask in zip(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np):
         temp_mask = MaskData()
         temp_mask.header = Header()
         temp_mask.phrase = phrase
-        temp_mask.centroid = Point(x=float(centroid[0]), y=float(centroid[1]), z=float(depth_val))  # the z part of the point is depth (in mm)
-                                                                                                    # this should not be confused for a point in
-                                                                                                    # 3d cartesian space, as x and y are in px
+        temp_mask.centroid_px = centroids_as_pixels # TODO fix custom message
+        temp_mask.centroid = centroid
         temp_mask.logit = float(logit)
         temp_mask.avg_depth = float(avg_depth)
         mask_image = (mask * 255).astype(np.uint8)
@@ -173,50 +183,26 @@ def map_depth_mask_to_rgb(depth_mask, rgb_image, depth_image, colour_depth_map):
 
     return rgb_mask
 
-def get_point_xyz(undistorted, point, depth_params):
+def get_point_xyz(point, depth_array, camera_params:CameraParams):
     """
-    Maps a pixel (r, c) to Cartesian coordinates (x, y, z) using the undistorted depth image.
+    Maps a pixel (r, c) to Cartesian coordinates (x, y, z) using the depth image.
 
     Parameters:
-    - undistorted: The undistorted depth image as a 2D numpy array.
-    - r, c: The row and column of the pixel.
-    - depth_params: A dictionary containing the depth camera's intrinsic parameters:
-        {
-            'cx': cx,
-            'cy': cy,
-            'fx': fx,
-            'fy': fy
-        }
+    - point: Contains the row and column (r, c) of the pixel.
+    - depth_array: Array of depth values corresponding to the size of the image
+    - camera_params: A CameraParams object containing the camera parameters.
 
     Returns:
     - A tuple (x, y, z) representing the Cartesian coordinates.
-
-    This function is a conversion of the getPointXYZ C++ function in the libfreenect2 package
-    See here: https://github.com/OpenKinect/libfreenect2/blob/fd64c5d9b214df6f6a55b4419357e51083f15d93/src/registration.cpp#L342
     """
-    r = point[0]
-    c = point[1]
-    bad_point = np.nan
-    cx = depth_params['cx']
-    cy = depth_params['cy']
-    fx = 1 / depth_params['fx']
-    fy = 1 / depth_params['fy']
+    r, c = point
+    z = depth_array[r][c]
 
-    depth_val = undistorted[r, c] / 1000.0  # scaling factor to convert to meters
+    x = ((r - camera_params.cx) * z) / camera_params.fx
+    y = ((c - camera_params.cy) * z) / camera_params.fy
 
-    if np.isnan(depth_val) or depth_val <= 0.001:
-        # depth value is not valid
-        x = y = z = bad_point
-    else:
-        x = (c + 0.5 - cx) * fx * depth_val
-        y = (r + 0.5 - cy) * fy * depth_val
-        z = depth_val
+    return (x,y,z)
 
-    # Convert to mm
-    x = x / 1000
-    y = y / 1000
-    z = z / 1000
-    return x, y, z
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
 # -------------------------------------------------- Target finding -------------------------------------------------------
