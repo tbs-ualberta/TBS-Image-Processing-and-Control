@@ -32,5 +32,15 @@ RUN git clone https://github.com/luca-medeiros/lang-segment-anything
 WORKDIR /root/lang-segment-anything
 RUN pip install -e .
 
+WORKDIR /root/setup
+
+# Preinstall AI model so the programs running it don't have to load it every time
+RUN <<EOF
+echo 'from lang_sam import LangSAM
+model = LangSAM(sam_type="vit_b")
+print("Model successfully loaded.")' >> main.py
+EOF
+RUN python main.py
+
 # Default command
 CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash"]
