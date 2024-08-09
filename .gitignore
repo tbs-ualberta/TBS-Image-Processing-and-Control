@@ -10,6 +10,6 @@ venv/
 /build/
 
 # Ignore .vscode folder
-.vscode/
+.vscode/*
 
 # Ignore other repositories in this folder

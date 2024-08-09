@@ -10,7 +10,7 @@ import cv2
 from std_msgs.msg import Header
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
+def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image_msg):
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
@@ -29,7 +29,7 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
         mask_array.mask_data.append(temp_mask)
     # Add rgb image to array data
     mask_array.rgb_image = bridge.cv2_to_imgmsg(rgb_image, encoding='bgr8')
-    mask_array.depth_image = bridge.cv2_to_imgmsg(depth_image, encoding='passthrough')
+    mask_array.depth_image = depth_image_msg
     return mask_array
 
 def unpack_MaskArray(mask_data):

@@ -1,0 +1,32 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/andor/ranger_mini_ws/build/image_processing",
+        "/home/andor/ranger_mini_ws/install/image_processing/lib/python3.10/site-packages",
+        "/home/andor/ranger_mini_ws/install/process_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/install/dwb_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/build/nav2_simple_commander",
+        "/home/andor/nav2_ws/install/nav2_simple_commander/lib/python3.10/site-packages",
+        "/home/andor/nav2_ws/install/nav2_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/install/nav2_common/local/lib/python3.10/dist-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_teleop/lib/python3.10/site-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_example/lib/python3.10/site-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/andor/ranger_mini_ws/build/image_processing",
+        "/home/andor/ranger_mini_ws/install/image_processing/lib/python3.10/site-packages",
+        "/home/andor/ranger_mini_ws/install/process_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/install/dwb_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/build/nav2_simple_commander",
+        "/home/andor/nav2_ws/install/nav2_simple_commander/lib/python3.10/site-packages",
+        "/home/andor/nav2_ws/install/nav2_msgs/local/lib/python3.10/dist-packages",
+        "/home/andor/nav2_ws/install/nav2_common/local/lib/python3.10/dist-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_teleop/lib/python3.10/site-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_example/lib/python3.10/site-packages",
+        "/home/andor/tutorial_ws/install/turtlebot3_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

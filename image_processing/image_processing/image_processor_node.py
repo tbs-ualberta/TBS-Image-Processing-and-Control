@@ -37,6 +37,7 @@ from utils import calculate_centroids, get_avg_depth, find_target, convert_to_Ma
 import warnings
 from transformers import logging
 from rclpy.duration import Duration
+import numpy as np
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -88,13 +89,14 @@ class ImageProcessor(Node):
 
         # Define subscribers for camera data (i.e. rgb and depth images)
         self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_img_topic)
-        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, self.depth_img_topic)
+        self.left_depth_reg_sub = message_filters.Subscriber(self, Image,self.depth_img_topic)
 
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
 
         self.rgb_img = None
-        self.depth_img = None
+        self.depth_img_msg = None
+        self.depth_array = None
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
@@ -105,7 +107,7 @@ class ImageProcessor(Node):
         self.get_logger().info("Image Processor Node Started")
 
     def process_images(self):
-        if self.rgb_img is None or self.depth_img is None:
+        if self.rgb_img is None or self.depth_array is None:
             return
         
         try:
@@ -113,7 +115,8 @@ class ImageProcessor(Node):
             process_time_start = self.get_clock().now()
 
             rgb_image = self.rgb_img
-            depth_image = self.depth_img
+            depth_array = self.depth_array
+            depth_img_msg = self.depth_img_msg
 
             # For publishing mask and centroid data
             mask_array = MaskArray() 
@@ -141,17 +144,17 @@ class ImageProcessor(Node):
 
             # Find corresponding RGB values from pixel coordinates
             centroid_depths = []
-            centroid_depths = [depth_image[y+1,x] for x, y in centroids_as_pixels]
+            centroid_depths = [depth_array[y,x] for x, y in centroids_as_pixels]
 
             # Find average depth value of each mask
             avg_depths = []
-            avg_depths = [get_avg_depth(mask, depth_image) for mask in masks_np]
+            avg_depths = [get_avg_depth(mask, depth_array) for mask in masks_np]
 
             # Find target
             target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_img_msg)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -192,7 +195,8 @@ class ImageProcessor(Node):
 
     def image_callback(self, rgb_msg, depth_msg):
         self.rgb_img = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
-        self.depth_img = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
+        self.depth_img_msg = depth_msg
+        self.depth_array = np.frombuffer(depth_msg.data, dtype=np.float32).reshape(depth_msg.height, depth_msg.width)
         # self.get_logger().info("Image received!")
 
     def cleanup(self):
