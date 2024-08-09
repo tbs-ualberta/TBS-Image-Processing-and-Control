@@ -28,7 +28,8 @@ setup(
             'image_display = image_processing.image_display_node:main',
             'image_processor = image_processing.image_processor_node:main',
             'image_saver = image_processing.image_save_node:main',
-            'ranger_control_demo = image_processing.ranger_control_demo:main'
+            'ranger_control_demo = image_processing.ranger_control_demo:main',
+            'zed_depth_test = image_processing.zed_depth_test:main'
         ],
     },
 )

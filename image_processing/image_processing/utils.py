@@ -8,9 +8,10 @@ import numpy as np
 from scipy.ndimage import measurements, label
 import cv2
 from std_msgs.msg import Header
+import math
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image_msg):
+def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
@@ -18,9 +19,9 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
         temp_mask = MaskData()
         temp_mask.header = Header()
         temp_mask.phrase = phrase
-        temp_mask.centroid = Point(x=float(centroid[0]), y=float(centroid[1]), z=float(depth_val)) # the z part of the point is depth (in mm)
-                                                                        # this should not be confused for a point in
-                                                                        # 3d cartesian space, as x and y are in px
+        temp_mask.centroid = Point(x=float(centroid[0]), y=float(centroid[1]), z=float(depth_val))  # the z part of the point is depth (in mm)
+                                                                                                    # this should not be confused for a point in
+                                                                                                    # 3d cartesian space, as x and y are in px
         temp_mask.logit = float(logit)
         temp_mask.avg_depth = float(avg_depth)
         mask_image = (mask * 255).astype(np.uint8)
@@ -29,7 +30,7 @@ def convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, 
         mask_array.mask_data.append(temp_mask)
     # Add rgb image to array data
     mask_array.rgb_image = bridge.cv2_to_imgmsg(rgb_image, encoding='bgr8')
-    mask_array.depth_image = depth_image_msg
+    mask_array.depth_image = bridge.cv2_to_imgmsg(depth_image, encoding='32FC1')
     return mask_array
 
 def unpack_MaskArray(mask_data):
@@ -134,7 +135,7 @@ def get_avg_depth(mask_np, registered_depth_img):
     depth_vals = []
     for y, x in coordinates:
         px_depth = registered_depth_img[y+1, x]
-        if px_depth != float('inf'):
+        if px_depth != float('inf') and not math.isnan(px_depth):
             depth_vals.append(px_depth)
 
     # Calculate average of depth values
@@ -225,15 +226,29 @@ def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels,
     # Find minimum depth of nearest target
     target_x = -1.0
     target_y = -1.0
-    target_depth = -1.0 # TODO if target depth is 0 (object not in detection range), it will be selected. This can cause issues, especially if the target is outside of the detection range.
+    target_depth = -1.0
+    TARGET_FOUND = False
     min_depth = float('inf')
     for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, object_depths, logits):
-        if target_phrase in temp_phrase and temp_depth < min_depth and temp_logit > target_confidence_threshold:
-            target_x = temp_centroid[0]
-            target_y = temp_centroid[1]
-            target_depth = temp_depth
-            min_depth = temp_depth
-    target = Point(x=target_x, y=target_y, z=target_depth) # Note: z in value is in mm, while x and y are in px
+        if target_phrase in temp_phrase and temp_logit > target_confidence_threshold:
+            if not TARGET_FOUND:
+                # if this is the first target found, set it as the target
+                target_x = float(temp_centroid[0])
+                target_y = float(temp_centroid[1])
+                if math.isnan(temp_depth): # If temp depth is invalid, return -1
+                    target_depth = -1.0
+                else: # If target depth is valid, return depth and update min depth
+                    target_depth = float(temp_depth)
+                    min_depth = temp_depth
+                TARGET_FOUND = True
+            
+            elif not math.isnan(temp_depth) and temp_depth < min_depth:
+                # if any more valid targets are found that are closer, set that as the target
+                target_x = float(temp_centroid[0])
+                target_y = float(temp_centroid[1])
+                target_depth = float(temp_depth)
+                min_depth = temp_depth
+    target = Point(x=target_x, y=target_y, z=target_depth) # Note: z value is in mm, while x and y are in px
     return target
 # -------------------------------------------------- Target finding -------------------------------------------------------
 

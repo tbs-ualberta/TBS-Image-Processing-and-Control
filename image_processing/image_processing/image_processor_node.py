@@ -11,6 +11,9 @@ PROCESSING_RATE = 1 # in Hz
 # The minimum confidence the model must have to use the object as a target
 TARGET_CONFIDENCE_THRESHOLD = 0.1
 
+# If the processing should follow the specified rate or just do it as fast as possible
+REGULATE_PROCESS_RATE = False
+
 # --------------------------------------------------------------------------------------------------------------------
 
 # -------------------------------------------- Calculated constants --------------------------------------------------
@@ -65,10 +68,10 @@ class ImageProcessor(Node):
 
         # Specifies whether the output should clear the console before outputting each cycle data
         self.CLEAR_OUTPUT = self.declare_parameter('clear_output', 'true').get_parameter_value().string_value
-        self.CLEAR_OUTPUT = (self.CLEAR_OUTPUT.lower() == 'true')
+        self.CLEAR_OUTPUT = (self.CLEAR_OUTPUT.lower() == 'false')
 
         # Specifies RGB image topic name
-        self.rgb_img_topic = self.declare_parameter('rgb_img_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
+        self.rgb_image_topic = self.declare_parameter('rgb_image_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
 
         # Specifies Depth image topic name
         self.depth_img_topic = self.declare_parameter('depth_img_topic', 'zed/zed_node/depth/depth_registered').get_parameter_value().string_value
@@ -78,7 +81,7 @@ class ImageProcessor(Node):
         self.get_logger().info(f'target: {self.target}')
         self.get_logger().info(f'print_output: {self.PRINT_OUTPUT}')
         self.get_logger().info(f'clear_output: {self.CLEAR_OUTPUT}')
-        self.get_logger().info(f'rgb image topic: {self.rgb_img_topic}')
+        self.get_logger().info(f'rgb image topic: {self.rgb_image_topic}')
         self.get_logger().info(f'depth image topic: {self.depth_img_topic}')
         
         # Define publisher for mask data
@@ -87,39 +90,42 @@ class ImageProcessor(Node):
         # Define publisher for target position data
         self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
-        # Define subscribers for camera data (i.e. rgb and depth images)
-        self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_img_topic)
-        self.left_depth_reg_sub = message_filters.Subscriber(self, Image,self.depth_img_topic)
+        # Define subscribers for camera data (i.e. rgb and depth images and camera info)
+        self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_image_topic)
+        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, self.depth_img_topic)
 
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
 
-        self.rgb_img = None
-        self.depth_img_msg = None
+        self.rgb_image = None
+        self.depth_image = None
         self.depth_array = None
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
 
-        # Set up timers to call process function
-        self.processing_timer = self.create_timer(PROCESSING_INTERVAL, self.process_images)
+        if REGULATE_PROCESS_RATE:
+            # Set up timers to call process function
+            self.processing_timer = self.create_timer(PROCESSING_INTERVAL, self.process_images)
         
         self.get_logger().info("Image Processor Node Started")
 
     def process_images(self):
-        if self.rgb_img is None or self.depth_array is None:
+        if self.rgb_image is None or self.depth_image is None:
             return
         
         try:
             # Save start time (to evaluate process time)
             process_time_start = self.get_clock().now()
 
-            rgb_image = self.rgb_img
-            depth_array = self.depth_array
-            depth_img_msg = self.depth_img_msg
+            rgb_image = self.rgb_image
+            depth_image = self.depth_image
 
             # For publishing mask and centroid data
-            mask_array = MaskArray() 
+            mask_array = MaskArray()
+
+            # Convert depth image to depth array
+            depth_array = np.array(depth_image, dtype=np.float32)
 
             # Convert image to PIL format
             image_pil = PilImg.fromarray(rgb_image)
@@ -145,16 +151,18 @@ class ImageProcessor(Node):
             # Find corresponding RGB values from pixel coordinates
             centroid_depths = []
             centroid_depths = [depth_array[y,x] for x, y in centroids_as_pixels]
+            print("Centroid depths: " + str(centroid_depths))
 
             # Find average depth value of each mask
             avg_depths = []
             avg_depths = [get_avg_depth(mask, depth_array) for mask in masks_np]
+            print("Average depths: " + str(avg_depths))
 
             # Find target
             target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_img_msg)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroid_depths, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -194,10 +202,15 @@ class ImageProcessor(Node):
             self.get_logger().error(f"Error: {e}")
 
     def image_callback(self, rgb_msg, depth_msg):
-        self.rgb_img = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
-        self.depth_img_msg = depth_msg
-        self.depth_array = np.frombuffer(depth_msg.data, dtype=np.float32).reshape(depth_msg.height, depth_msg.width)
+        self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
+        self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
+
+        depth_array = np.array(self.depth_image, dtype=np.float32)
+
         # self.get_logger().info("Image received!")
+
+        if not REGULATE_PROCESS_RATE:
+            self.process_images()
 
     def cleanup(self):
         self.get_logger().info("Shutting down Image Processor Node")

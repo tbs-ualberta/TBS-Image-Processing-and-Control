@@ -75,7 +75,13 @@ The first line in Dockerfile.upper can then be replaced with: ```FROM image_proc
 
 **Note:** To build the Dockerfiles on x86 architecture, [this](https://www.stereolabs.com/docs/docker/building-arm-container-on-x86) guide is helpful.
 
-To run the container and ensure it is connected to the other ROS2 nodes running on the system (either in other containers or natively) run the following:
+To run the container from a locally built image and ensure it is connected to the other ROS2 nodes running on the system (either in other containers or natively) run the following:
 ```bash
 docker run -it --network="host" image_processing:latest
+```
+
+Alternatively, the Docker Image can be pulled directly from Docker Hub and run using the following command:
+```bash
+docker pull andors/image_processing:latest
+docker run -it --network="host" andors/image_processing:latest
 ```

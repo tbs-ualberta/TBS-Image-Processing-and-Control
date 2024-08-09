@@ -28,4 +28,5 @@ RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
 # ENTRYPOINT ["/root/entrypoint.sh"]
 
 # Default command
-CMD ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
+CMD ["/bin/bash", "-c", \
+"source /opt/ros/humble/setup.bash && source /root/ros_ws/install/setup.bash && ros2 launch image_processing object_detection_lite.launch.py"]
