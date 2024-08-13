@@ -25,7 +25,7 @@ This program features a variety of ROS parameters that can be modified within th
 
 | Name | Type | Description | Example Value |
 | --- | --- | --- | --- |
-| `prompt` | `string` | The prompt fed into the AI model for image detection. | 'person.phone' |
+| `prompt` | `string` | The prompt fed into the AI model for image detection. Multiple prompts can be detected by separating them with a period. | 'person.phone' |
 | `target` | `string` | The target used to publish goal data for navigation. It **must** be contained in the prompt string. | 'person' |
 | `target_confidence_threshold` | `double` | The minimum confidence the model must have to consider the object as a target (ranges from 0.0-0.99). | 0.5 |
 | `print_output` | `boolean` | Determines whether the program prints information about each processed frame to the console. | False |
