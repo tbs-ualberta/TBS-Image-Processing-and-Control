@@ -1,11 +1,10 @@
 # Authored by: Andor Siegers
 
-import rclpy
 from geometry_msgs.msg import Point
 from process_msgs.msg import MaskArray, MaskData
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from scipy.ndimage import measurements, label
+from scipy.ndimage import measurements
 import cv2
 from std_msgs.msg import Header
 import math
@@ -22,16 +21,32 @@ class CameraParams():
 # -------------------------------------------------------------------------------------------------------------------------
 
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
-def convert_to_MaskArray(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np, rgb_image, depth_image):
+def convert_to_MaskArray(centroids_px, centroids_cartesian, phrases, logits, avg_depths, masks, rgb_image, depth_image):
+    '''
+    Converts regular Python data types into a ROS2 message structure that can be published to a ROS2 topic.
+
+    Inputs:
+    - centroids_px: 2D tuple containing the position of the centroids in pixel coordinates
+    - centroids_cartesian: 3D tuple containing the position of the centroids in cartesian coordinates, with the center of the camera as the origin
+    - phrases: array of strings containing the phrase of each mask corresponding to what object is being masked
+    - logits: array of floats containing the confidence value of each mask output by the object detection model
+    - avg_depths: array of floats containing the average depths of each object calculated using the mask
+    - masks: array of 2D boolean arrays representing each mask (1 for masked, 0 for not masked)
+    - rgb_image: rgb image that all above values are calculated from
+    - depth_image: depth image that all above values are calculated from
+
+    Output:
+    - mask_array: MaskArray custom message structure that holds all mask data
+    '''
     bridge = CvBridge()
     mask_array = MaskArray()
     mask_array.header = Header()
-    for centroid_px, centroid, phrase, logit, avg_depth, mask in zip(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np):
+    for centroid_px, centroid_cart, phrase, logit, avg_depth, mask in zip(centroids_px, centroids_cartesian, phrases, logits, avg_depths, masks):
         temp_mask = MaskData()
         temp_mask.header = Header()
         temp_mask.phrase = phrase
-        temp_mask.centroid_px = centroids_as_pixels # TODO fix custom message
-        temp_mask.centroid = centroid
+        temp_mask.centroid_px = Point(x=float(centroid_px[0]), y=float(centroid_px[1]), z=float(0))
+        temp_mask.centroid = Point(x=float(centroid_cart[0]), y=float(centroid_cart[1]), z=float(centroid_cart[2]))
         temp_mask.logit = float(logit)
         temp_mask.avg_depth = float(avg_depth)
         mask_image = (mask * 255).astype(np.uint8)
@@ -43,26 +58,42 @@ def convert_to_MaskArray(centroids_as_pixels, centroids, phrases, logits, avg_de
     mask_array.depth_image = bridge.cv2_to_imgmsg(depth_image, encoding='32FC1')
     return mask_array
 
-def unpack_MaskArray(mask_data):
+def unpack_MaskArray(mask_array):
+    '''
+    Unpacks custom MaskArray message into regular Python datatypes.
+
+    Input:
+    - mask_array: MaskArray custom message structure that holds all mask data
+
+    Output:
+    - phrases: array of strings containing the phrase of each mask corresponding to what object is being masked
+    - centroids_px: 2D tuple containing the position of the centroids in pixel coordinates
+    - centroids_cartesian: 3D tuple containing the position of the centroids in cartesian coordinates, with the center of the camera as the origin
+    - logits: array of floats containing the confidence value of each mask output by the object detection model
+    - avg_depths: array of floats containing the average depths of each object calculated using the mask
+    - masks: array of 2D boolean arrays representing each mask (1 for masked, 0 for not masked)
+    - rgb_image: rgb image that all above values are calculated from
+    - depth_image: depth image that all above values are calculated from
+    '''
     try:
         bridge = CvBridge()
 
         # Empty arrays
         phrases = []
-        centroids = []
-        centroid_depths = []
+        centroids_px = []
+        centroids_cartesian = []
         logits = []
         avg_depths = []
         masks = []  # boolean arrays
 
-        rgb_image = bridge.imgmsg_to_cv2(mask_data.rgb_image, 'bgr8')
-        depth_image = bridge.imgmsg_to_cv2(mask_data.depth_image, desired_encoding='passthrough')
+        rgb_image = bridge.imgmsg_to_cv2(mask_array.rgb_image, 'bgr8')
+        depth_image = bridge.imgmsg_to_cv2(mask_array.depth_image, '32FC1')
 
         # Convert data back to accessible data types
-        for temp_mask in mask_data.mask_data:
+        for temp_mask in mask_array.mask_data:
             temp_phrase = temp_mask.phrase
-            centroid_loc = (int(temp_mask.centroid.x), int(temp_mask.centroid.y))  # Convert to integer
-            depth_val = temp_mask.centroid.z / 1000
+            centroid_loc_px = (int(temp_mask.centroid_px.x), int(temp_mask.centroid_px.y))  # Convert to integer
+            centroid_loc_cart = (temp_mask.centroid.x, temp_mask.centroid.y, temp_mask.centroid.z)
             temp_logit = temp_mask.logit
             temp_avg_depth = temp_mask.avg_depth / 1000
 
@@ -70,13 +101,13 @@ def unpack_MaskArray(mask_data):
             mask_img = (mask_img / 255).astype(bool)  # Convert back to boolean array
             
             phrases.append(temp_phrase)
-            centroids.append(centroid_loc)
-            centroid_depths.append(depth_val)
+            centroids_px.append(centroid_loc_px)
+            centroids_cartesian.append(centroid_loc_cart)
             logits.append(temp_logit)
             avg_depths.append(temp_avg_depth)
             masks.append(mask_img)
 
-        return phrases, centroids, centroid_depths, logits, avg_depths, masks, rgb_image, depth_image
+        return phrases, centroids_px, centroids_cartesian, logits, avg_depths, masks, rgb_image, depth_image
 
     except CvBridgeError as e:
         print(f"CvBridge Error: {e}")
@@ -86,29 +117,6 @@ def unpack_MaskArray(mask_data):
 # --------------------------------------------- Data Conversion functions -------------------------------------------------
 
 # -------------------------------------------------- Mask Processing ------------------------------------------------------
-def split_mask(mask, min_connection_width=5):
-    # Dilate the mask to remove narrow connections
-    kernel = np.ones((min_connection_width, min_connection_width), np.uint8)
-    dilated_mask = cv2.dilate(mask.astype(np.uint8), kernel, iterations=1)
-    
-    # Label connected components in the dilated mask
-    labeled_mask, num_labels = label(dilated_mask)
-    
-    # Initialize a list to store the separated masks
-    separated_masks = []
-    
-    for label_index in range(1, num_labels + 1):
-        # Create a mask for the current component
-        component_mask = (labeled_mask == label_index)
-        
-        # Erode back the component mask to restore its original shape
-        eroded_mask = cv2.erode(component_mask.astype(np.uint8), kernel, iterations=1)
-        
-        # Add the eroded mask to the list
-        separated_masks.append(eroded_mask.astype(bool))
-    
-    return separated_masks
-
 def is_mask_overlapping(mask, overlap_masks, OVERLAP_THRESHOLD):
     '''
     Calculates whether mask is overlaping any of overlap_masks by the overlap threshold.
@@ -132,20 +140,23 @@ def calculate_centroids(masks_np):
         centroid = measurements.center_of_mass(m)
         centroids.append(centroid)
 
-    # convert y,x to x,y
-    centroids_as_pixels = [(int(x), int(y)) for y, x in centroids]
+    # convert x,y to y,x
+    # centroids_px = [(int(y), int(x)) for x, y in centroids]
 
-    return centroids_as_pixels
+    centroids_px = [(int(y), int(x)) for y, x in centroids]
 
-def get_avg_depth(mask_np, registered_depth_img):
+    return centroids_px
+
+def get_avg_depth(mask_np, depth_array):
     # Convert boolean mask to list of coordinates
     coordinates = np.argwhere(mask_np)
 
     # Use coordinate list to find corresponding depth values
     depth_vals = []
     for y, x in coordinates:
-        px_depth = registered_depth_img[y+1, x]
+        px_depth = depth_array[y, x]
         if px_depth != float('inf') and not math.isnan(px_depth):
+            # Only add valid depths to depth_vals
             depth_vals.append(px_depth)
 
     # Calculate average of depth values
@@ -201,40 +212,48 @@ def get_point_xyz(point, depth_array, camera_params:CameraParams):
     x = ((r - camera_params.cx) * z) / camera_params.fx
     y = ((c - camera_params.cy) * z) / camera_params.fy
 
-    return (x,y,z)
+    return (x, y, z)
 
 # -------------------------------------------- Coordinate Transformations -------------------------------------------------
 
 # -------------------------------------------------- Target finding -------------------------------------------------------
-def find_target(target_phrase, target_confidence_threshold, centroids_as_pixels, phrases, object_depths, logits):
+def find_target(target_phrase, target_confidence_threshold, centroids_cartesian, phrases, avg_depths, logits):
     # Selects which object to target. This can be implemented in different ways,
     # but for now, it will just select the closest object.
-    # Find minimum depth of nearest target
+
+    # Initialize target position values
     target_x = -1.0
     target_y = -1.0
     target_depth = -1.0
+
+    # Records whether a target has been found
     TARGET_FOUND = False
+
+    # Used to find the closest target
     min_depth = float('inf')
-    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_as_pixels, phrases, object_depths, logits):
+
+    # Loop through scanned objects and find valid targets
+    for temp_centroid, temp_phrase, temp_depth, temp_logit in zip(centroids_cartesian, phrases, avg_depths, logits):
         if target_phrase in temp_phrase and temp_logit > target_confidence_threshold:
             if not TARGET_FOUND:
-                # if this is the first target found, set it as the target
+                # If this is the first target found, set it as the target
                 target_x = float(temp_centroid[0])
                 target_y = float(temp_centroid[1])
-                if math.isnan(temp_depth): # If temp depth is invalid, return -1
+                if math.isnan(temp_depth): # If target depth is invalid, set depth -1
                     target_depth = -1.0
-                else: # If target depth is valid, return depth and update min depth
+                else: # If target depth is valid, set depth to avg_depth and update min_depth
                     target_depth = float(temp_depth)
                     min_depth = temp_depth
                 TARGET_FOUND = True
             
             elif not math.isnan(temp_depth) and temp_depth < min_depth:
-                # if any more valid targets are found that are closer, set that as the target
+                # If any more valid targets are found that are closer, set that as the target
                 target_x = float(temp_centroid[0])
                 target_y = float(temp_centroid[1])
                 target_depth = float(temp_depth)
                 min_depth = temp_depth
-    target = Point(x=target_x, y=target_y, z=target_depth) # Note: z value is in mm, while x and y are in px
+    target = Point(x=target_x, y=target_y, z=target_depth)  # Note: these values are in cartesian coordinates, with x and y being the position
+                                                            # of the centroid and the depth being the average depth of the object.
     return target
 # -------------------------------------------------- Target finding -------------------------------------------------------
 

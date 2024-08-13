@@ -24,6 +24,7 @@ PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
 # --------------------------------------------------------------------------------------------------------------------
 
 import rclpy
+import rclpy.logging
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 from sensor_msgs.msg import Image, CameraInfo
@@ -35,21 +36,17 @@ import sys
 import requests
 from PIL import Image as PilImg
 from lang_sam import LangSAM
+import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from utils import CameraParams, calculate_centroids, get_avg_depth, find_target, convert_to_MaskArray, get_point_xyz
 import warnings
 from transformers import logging
 from rclpy.duration import Duration
-import numpy as np
 
 # Suppress unimportant messages printing to the console
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 logging.set_verbosity_error()
-
-import torch
-print(torch.__version__)
-print(torch.cuda.is_available())
 
 class ImageProcessor(Node):
     def __init__(self):
@@ -71,18 +68,18 @@ class ImageProcessor(Node):
         self.CLEAR_OUTPUT = (self.CLEAR_OUTPUT.lower() == 'false')
 
         # Specifies RGB image topic name
-        self.rgb_image_topic = self.declare_parameter('rgb_image_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
+        rgb_image_topic = self.declare_parameter('rgb_image_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
 
         # Specifies Depth image topic name
-        self.depth_img_topic = self.declare_parameter('depth_img_topic', 'zed/zed_node/depth/depth_registered').get_parameter_value().string_value
+        depth_img_topic = self.declare_parameter('depth_img_topic', 'zed/zed_node/depth/depth_registered').get_parameter_value().string_value
 
         # Debug: print the parameters to verify
         self.get_logger().info(f'prompt: {self.prompt}')
         self.get_logger().info(f'target: {self.target}')
         self.get_logger().info(f'print_output: {self.PRINT_OUTPUT}')
         self.get_logger().info(f'clear_output: {self.CLEAR_OUTPUT}')
-        self.get_logger().info(f'rgb image topic: {self.rgb_image_topic}')
-        self.get_logger().info(f'depth image topic: {self.depth_img_topic}')
+        self.get_logger().info(f'rgb image topic: {rgb_image_topic}')
+        self.get_logger().info(f'depth image topic: {depth_img_topic}')
         
         # Define publisher for mask data
         self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
@@ -91,29 +88,32 @@ class ImageProcessor(Node):
         self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
         # Define subscribers for camera data (i.e. rgb and depth images and camera info)
-        self.left_rgb_sub = message_filters.Subscriber(self, Image, self.rgb_image_topic)
-        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, self.depth_img_topic)
-        self.cam_info_sub = self.create_subscription(CameraInfo,' /zed/zed_node/depth/camera_info', self.cam_info_callback)
+        self.left_rgb_sub = message_filters.Subscriber(self, Image, rgb_image_topic)
+        self.left_depth_reg_sub = message_filters.Subscriber(self, Image, depth_img_topic)
+        self.cam_info_sub = self.create_subscription(CameraInfo, '/zed/zed_node/depth/camera_info', self.cam_info_callback, 10)
 
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
 
         self.rgb_image = None
         self.depth_image = None
-        self.depth_array = None
         self.camera_params = CameraParams()
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
 
         if REGULATE_PROCESS_RATE:
-            # Set up timers to call process function
+            # Set up timers to call process function (only if process rate is being regulated)
             self.processing_timer = self.create_timer(PROCESSING_INTERVAL, self.process_images)
         
         self.get_logger().info("Image Processor Node Started")
 
     def process_images(self):
         if self.rgb_image is None or self.depth_image is None:
+            self.get_logger().info("Depth image and/or rgb image not received. Waiting to process...", throttle_duration_sec=3)
+            return
+        elif self.camera_params.width == 0:
+            self.get_logger().info("Camera parameters not received. Waiting to process...", throttle_duration_sec=3)
             return
         
         try:
@@ -122,6 +122,9 @@ class ImageProcessor(Node):
 
             rgb_image = self.rgb_image
             depth_image = self.depth_image
+
+            self.get_logger().info("RGB image size: " + str(rgb_image.shape))
+            self.get_logger().info("Depth image size: " + str(depth_image.shape))
 
             # For publishing mask and centroid data
             mask_array = MaskArray()
@@ -150,20 +153,23 @@ class ImageProcessor(Node):
             centroids_as_pixels = []
             centroids_as_pixels = calculate_centroids(masks_np)
 
-            # Find each centroid's point in 3D space TODO
+            # Find each centroid's point in 3D cartesian space, with the depth camera as the origin
             centroids_cartesian = []
             for centroid_as_px in centroids_as_pixels:
-                centroids_cartesian = get_point_xyz(centroid_as_px, depth_array, self.camera_params)
+                centroids_cartesian.append(get_point_xyz(centroid_as_px, depth_array, self.camera_params))
+            print("Cartesian Centroids: " + str(centroids_cartesian))
 
             # Find average depth value of each mask
             avg_depths = []
             avg_depths = [get_avg_depth(mask, depth_array) for mask in masks_np]
+            print("Average Depths: " + str(avg_depths))
 
             # Find target
-            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_as_pixels, phrases, avg_depths, logits)
+            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_cartesian, phrases, avg_depths, logits)
+            print("Found target at: " + str(target_pos))
 
             # Convert to correct message type for publishing
-            mask_array = convert_to_MaskArray(centroids_as_pixels, centroids, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
+            mask_array = convert_to_MaskArray(centroids_as_pixels, centroids_cartesian, phrases, logits, avg_depths, masks_np, rgb_image, depth_image)
             
             # Publish target values
             self.target_pub.publish(target_pos)
@@ -205,24 +211,32 @@ class ImageProcessor(Node):
     def image_callback(self, rgb_msg, depth_msg):
         self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
         self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
-
-        depth_array = np.array(self.depth_image, dtype=np.float32)
-
         # self.get_logger().info("Image received!")
-
         if not REGULATE_PROCESS_RATE:
             self.process_images()
     
     def cam_info_callback(self, cam_info_msg:CameraInfo):
-        self.camera_params.height = cam_info_msg.height
-        self.camera_params.width = cam_info_msg.width
-        instrinsic_matrix = cam_info_msg.p
-        self.camera_params.fx = instrinsic_matrix[0][0]
-        self.camera_params.fy = instrinsic_matrix[1][1]
-        self.camera_params.cx = instrinsic_matrix[0][2]
-        self.camera_params.cy = instrinsic_matrix[1][2]
+        # Get camera info from standardized camera info message (http://docs.ros.org/en/diamondback/api/sensor_msgs/html/__CameraInfo_8py_source.html)
+        try:
+            self.camera_params.height = cam_info_msg.height
+            self.camera_params.width = cam_info_msg.width
+            instrinsic_matrix = cam_info_msg.p
+            self.camera_params.fx = instrinsic_matrix[0]
+            self.camera_params.fy = instrinsic_matrix[5]
+            self.camera_params.cx = instrinsic_matrix[2]
+            self.camera_params.cy = instrinsic_matrix[6]
+            
+            self.get_logger().info("Camera info retrieved. Using following values:")
+            self.get_logger().info("Height: " + str(self.camera_params.height))
+            self.get_logger().info("Width: " + str(self.camera_params.width))
+            self.get_logger().info("fx: " + str(self.camera_params.fx))
+            self.get_logger().info("fy: " + str(self.camera_params.fy))
+            self.get_logger().info("cx: " + str(self.camera_params.cx))
+            self.get_logger().info("cy: " + str(self.camera_params.cy))
 
-        self._subscriptions.remove(self.cam_info_sub)
+            self._subscriptions.remove(self.cam_info_sub)
+        except IndexError as e:
+            self.get_logger().error("Unable to save camera info: " + str(e) +"\nRetrying...")
 
     def cleanup(self):
         self.get_logger().info("Shutting down Image Processor Node")

@@ -40,25 +40,7 @@ class RangerController(Node):
 
         # Initiate robot velocity variable
         vel = Twist()
-
-        # Define image width and window tolerance
-        IMAGE_WIDTH = 1280
-        ALLOWABLE_WINDOW = 300 # px
-
-        if tar_x == -1:
-            print("No valid target")
-            vel.angular.z = 0.0
-        elif tar_x < IMAGE_WIDTH/2 - ALLOWABLE_WINDOW/2:
-            print("Turning right")
-            vel.angular.z = 0.5
-        elif tar_x > IMAGE_WIDTH/2 + ALLOWABLE_WINDOW/2:
-            print("Turning left")
-            vel.angular.z = -0.5
-        else:
-            print("Target within range")
-            vel.angular.z = 0.0
         
-        '''
         # Check if target was found in image
         if tar_x == -1 and tar_y == -1 and tar_z == -1:
             # If target not found in image
@@ -82,7 +64,6 @@ class RangerController(Node):
             # Check if target is within following distance
             if target_dist > self.FOLLOW_DIST:
                 vel.angular.z = self.LIN_VEL
-        '''
 
         # Publish velocity data
         self.cmd_vel_pub.publish(vel)
