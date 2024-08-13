@@ -3,17 +3,23 @@ This file is meant to describe the features of each script in the [image_process
 
 # Scripts
 
-## Image Display Program (not yet implemented on Jetson)
+## Image Display Program
+> [!NOTE]
+> This program is not yet implemented on the Jetson.
 
 [`img_display_node.py`](image_processing/image_display_node.py) simply displays the raw images output by the depth camera. This is helpful for debugging and developing new programs, as it is taken directly from the camera without any further processing.
 
-**Note:** this program is not necessary anymore, as RVIZ can be used to visualize image topics. However, it continues to be a part of this package to demonstrate how image topics can be subscribed to and processed.
+> [!NOTE]
+> This program is not necessary anymore, as RVIZ can be used to visualize image topics. However, it continues to be a part of this package to demonstrate how image topics can be subscribed to and processed.
 
-## Image Saving Program (not yet implemented on Jetson)
+## Image Saving Program
+> [!NOTE]
+> This program is not yet implemented on the Jetson.
 
 [`img_save_node.py`](image_processing/image_save_node.py) saves the raw images received from the depth camera, as well as the mask images to a specified folder on the computer. The adjustment of various program parameters  is enabled through the manipulation of the constants defined at the top of the file. These include the save directory, folder name, save rate, and a variety of other constants that determine whether each image type is saved or not. For example, if a test is being run where only RGB images need to be saved, the [`SAVE_RGB`](image_processing/image_save_node.py#L19) constant can be set to true, while all other save selection constants can be set to false. This allows for flexibility during testing and ensures that only important data is saved.
 
-**WARNING:** if the directory in which files are being saved already exists, this program will clear it before starting the saving process. This enables continued testing without filling up the computer’s disk space. To save the image files of a test permanently, they must either be moved or copied to a separate folder outside of the save folder. Alternatively, the [`SAVE_FOLDER_NAME`](image_processing/image_save_node.py#L10) and/or [`SAVE_PATH`](image_processing/image_save_node.py#L7) constants can be changed, leaving the previously saved data intact and creating a new directory to save image data to upon program startup.
+> [!CAUTION]
+> If the directory in which files are being saved already exists, this program will clear it before starting the saving process. This enables continued testing without filling up the computer’s disk space. To save the image files of a test permanently, they must either be moved or copied to a separate folder outside of the save folder. Alternatively, the [`SAVE_FOLDER_NAME`](image_processing/image_save_node.py#L10) and/or [`SAVE_PATH`](image_processing/image_save_node.py#L7) constants can be changed, leaving the previously saved data intact and creating a new directory to save image data to upon program startup.
 
 ## Image Processing Program
 
@@ -38,11 +44,14 @@ This program features a variety of ROS parameters that can be modified within th
 
 **Note:** changing the `prompt` parameter will change what the image recognition model will detect. This can be utilized to detect multiple objects in the image. The `target` parameter should contain only **one** object phrase, and **must** be contained within the prompt. This allows for detection of multiple objects, however the program sends the information of only one target to the robot control algorithm. This allows for some flexibility if multiple different kinds of objects need to be detected in the future.
 
-## Mask Display Program (not yet implemented on Jetson)
+## Mask Display Program
+> [!NOTE]
+> This program is not yet implemented on the Jetson.
 
 [`mask_display_node.py`](image_processing/mask_display_node.py) receives the mask data and displays it using the OpenCV python package. It does this by overlaying each mask in green over the base RGB image. It then draws each centroid over those masks with accompanying text that describes the phrase (or object detected by the program) and the depth of the centroid and/or the average depth of the mask (in meters). This program also publishes the final image to a ROS topic, which is read by the image saving program for image saving.
 
-**Note:** the mask display program relies on data published by the processing program, so should only be run after the processing program has started.
+> [!NOTE]
+> The mask display program relies on data published by the processing program, so should only be run after the processing program has started.
 
 ## Control Demo Program
 
@@ -61,7 +70,7 @@ This program features a variety of ROS parameters that can be modified within th
 # Launchfiles
 ## Object Detection
 [`object_detection.launch.py`](launch/object_detection.launch.py) is designed to allow the user to select which programs they would like to launch dynamically. It includes boolean launch parameters that activate/deactivate the following programs:
-| Program to Activate/Deactivate | Parameter |
+| Program to Activate/Deactivate | Parameter Name |
 | --- | --- |
 | [image display](image_processing/image_display_node.py) | [`run_img_display`](launch/object_detection.launch.py#L10) |
 | [image saving](image_processing/image_save_node.py) | [`run_img_save`](launch/object_detection.launch.py#L11) |
