@@ -2,27 +2,6 @@
 
 # DO NOT INSTALL IN CONDA ENVIRONMENT: this caused many incompatibility issues when tested
 
-# -------------------------------------------- User defined constants ------------------------------------------------
-
-# Processing frequency: this is the max frequency. It should also be noted that the image recognition is not
-# included in this time, so each cycle will be around 0.5s minimum, regardless of the set rate
-PROCESSING_RATE = 1 # in Hz
-
-# The minimum confidence the model must have to use the object as a target
-TARGET_CONFIDENCE_THRESHOLD = 0.1
-
-# If the processing should follow the specified rate or just do it as fast as possible
-REGULATE_PROCESS_RATE = False
-
-# --------------------------------------------------------------------------------------------------------------------
-
-# -------------------------------------------- Calculated constants --------------------------------------------------
-
-# Calculate the process interval in seconds
-PROCESSING_INTERVAL = 1.0 / PROCESSING_RATE
-
-# --------------------------------------------------------------------------------------------------------------------
-
 import rclpy
 import rclpy.logging
 from rclpy.node import Node
@@ -51,21 +30,36 @@ logging.set_verbosity_error()
 class ImageProcessor(Node):
     def __init__(self):
         super().__init__('image_processor')
+        # Initialize CvBridge
         self.bridge = CvBridge()
 
+        # -------------------------------------------- ROS Parameters ------------------------------------------------
+        
         # Specifies the prompt which the model masks
         self.prompt = self.declare_parameter('prompt', 'person').get_parameter_value().string_value # multiple objects can be detected using a '.' as a separator
 
-        # Specifies target. This allows for detection of multiple objects but only targetting of one
+        # Specifies target. This allows for detection of multiple objects but only targetting of one.
         self.target = self.declare_parameter('target', 'person').get_parameter_value().string_value # must be contained in the prompt
         
+        # The minimum confidence the model must have to consider the object as a target
+        self.target_confidence_threshold = self.declare_parameter('target_confidence_threshold', 0.5).get_parameter_value().double_value
+
         # Specifies whether to print the output to the terminal or not
-        self.PRINT_OUTPUT = self.declare_parameter('print_output', 'false').get_parameter_value().string_value
-        self.PRINT_OUTPUT = (self.PRINT_OUTPUT.lower() == 'true')
+        self.print_output_bool = self.declare_parameter('print_output', False).get_parameter_value().string_value
 
         # Specifies whether the output should clear the console before outputting each cycle data
-        self.CLEAR_OUTPUT = self.declare_parameter('clear_output', 'true').get_parameter_value().string_value
-        self.CLEAR_OUTPUT = (self.CLEAR_OUTPUT.lower() == 'false')
+        self.clear_output_bool = self.declare_parameter('clear_output', True).get_parameter_value().bool_value
+
+        # Specifies whether the processing rate should be regulated, or whether it should process as fast as possible
+        self.regulate_process_rate_bool = self.declare_parameter('regulate_process_rate', False).get_parameter_value().bool_value
+
+        # Processing frequency (in Hz): this is the max frequency. It should be noted that each cycle will take at 
+        # minimum the amount of time needed to process one image, regardless of the set rate.
+        self.processing_rate = self.declare_parameter('processing_rate', 1.0).get_parameter_value().double_value
+        if self.processing_rate == 0: # if processing rate is 0, don't regulate
+            self.regulate_process_rate_bool = False
+        else:
+            self.processing_interval = 1.0 / self.processing_rate # in seconds
 
         # Specifies RGB image topic name
         rgb_image_topic = self.declare_parameter('rgb_image_topic', 'zed/zed_node/rgb/image_rect_color').get_parameter_value().string_value # NOTE: this uses the rectified image, which may not be correct. It needs to be validated
@@ -73,13 +67,18 @@ class ImageProcessor(Node):
         # Specifies Depth image topic name
         depth_img_topic = self.declare_parameter('depth_img_topic', 'zed/zed_node/depth/depth_registered').get_parameter_value().string_value
 
+        # Specifies the camera info topic name
+        cam_info_topic = self.declare_parameter('cam_info_topic', 'zed/zed_node/depth/camera_info').get_parameter_value().string_value
+
         # Debug: print the parameters to verify
         self.get_logger().info(f'prompt: {self.prompt}')
         self.get_logger().info(f'target: {self.target}')
-        self.get_logger().info(f'print_output: {self.PRINT_OUTPUT}')
-        self.get_logger().info(f'clear_output: {self.CLEAR_OUTPUT}')
+        self.get_logger().info(f'print_output: {self.print_output_bool}')
+        self.get_logger().info(f'clear_output: {self.clear_output_bool}')
         self.get_logger().info(f'rgb image topic: {rgb_image_topic}')
         self.get_logger().info(f'depth image topic: {depth_img_topic}')
+
+        # ------------------------------------------------------------------------------------------------------------
         
         # Define publisher for mask data
         self.mask_pub = self.create_publisher(MaskArray, "process/mask_data", 10)
@@ -87,24 +86,25 @@ class ImageProcessor(Node):
         # Define publisher for target position data
         self.target_pub = self.create_publisher(Point, "process/target", 10) # in px
 
-        # Define subscribers for camera data (i.e. rgb and depth images and camera info)
+        # Define subscriber for camera info. This is called only once and then is destroyed, as the info it receives does not change throughout the program runtime.
+        self.cam_info_sub = self.create_subscription(CameraInfo, cam_info_topic, self.cam_info_callback, 10)
+
+        # Define subscribers for camera image data (i.e. rgb and depth images)
         self.left_rgb_sub = message_filters.Subscriber(self, Image, rgb_image_topic)
         self.left_depth_reg_sub = message_filters.Subscriber(self, Image, depth_img_topic)
-        self.cam_info_sub = self.create_subscription(CameraInfo, '/zed/zed_node/depth/camera_info', self.cam_info_callback, 10)
-
         self.ts = message_filters.TimeSynchronizer([self.left_rgb_sub, self.left_depth_reg_sub], queue_size=10)
         self.ts.registerCallback(self.image_callback)
 
+        self.camera_params = CameraParams()
         self.rgb_image = None
         self.depth_image = None
-        self.camera_params = CameraParams()
 
         # Initialize model
         self.model = LangSAM(sam_type = "vit_b")
 
-        if REGULATE_PROCESS_RATE:
+        if self.regulate_process_rate_bool:
             # Set up timers to call process function (only if process rate is being regulated)
-            self.processing_timer = self.create_timer(PROCESSING_INTERVAL, self.process_images)
+            self.processing_timer = self.create_timer(self.processing_interval, self.process_images)
         
         self.get_logger().info("Image Processor Node Started")
 
@@ -165,7 +165,7 @@ class ImageProcessor(Node):
             print("Average Depths: " + str(avg_depths))
 
             # Find target
-            target_pos = find_target(self.target, TARGET_CONFIDENCE_THRESHOLD, centroids_cartesian, phrases, avg_depths, logits)
+            target_pos = find_target(self.target, self.target_confidence_threshold, centroids_cartesian, phrases, avg_depths, logits)
             print("Found target at: " + str(target_pos))
 
             # Convert to correct message type for publishing
@@ -177,9 +177,9 @@ class ImageProcessor(Node):
             # Publish mask data
             self.mask_pub.publish(mask_array)
 
-            if self.PRINT_OUTPUT:
+            if self.print_output_bool:
                 # Clear the console for new output
-                if self.CLEAR_OUTPUT:
+                if self.clear_output_bool:
                     os.system('clear')
 
                 # Print data to console
@@ -212,7 +212,7 @@ class ImageProcessor(Node):
         self.rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, 'bgr8')
         self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
         # self.get_logger().info("Image received!")
-        if not REGULATE_PROCESS_RATE:
+        if not self.regulate_process_rate_bool:
             self.process_images()
     
     def cam_info_callback(self, cam_info_msg:CameraInfo):

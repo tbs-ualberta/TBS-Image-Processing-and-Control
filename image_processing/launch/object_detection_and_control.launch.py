@@ -13,10 +13,13 @@ def generate_launch_description():
             parameters=[
                 {'prompt': 'person.phone'},
                 {'target': 'person'},
-                {'print_output': 'true'},
-                {'clear_output': 'true'},
+                {'target_confidence_threshold': 0.1},
+                {'print_output': True},
+                {'clear_output': True},
+                {'regulate_process_rate': False},
                 {'rgb_img_topic': 'zed/zed_node/rgb/image_rect_color'},
-                {'depth_img_topic': 'zed/zed_node/depth/depth_registered'}
+                {'depth_img_topic': 'zed/zed_node/depth/depth_registered'},
+                {'cam_info_topic': 'zed/zed_node/depth/camera_info'}
             ]
         ),
         Node(
