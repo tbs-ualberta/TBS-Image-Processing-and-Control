@@ -1,12 +1,11 @@
 # Introduction
 
-This file documents the image_processing_and_control packages written for the Indro Robotics Ranger Mini 2.0 at the Telerobotic and Biorobotic Systems Group Laboratory at the University of Alberta. The image processing is intended to run in a Docker container, as it contains various delicate dependencies that need are difficult to install properly locally.
+This file documents the image_processing packages written for the Indro Robotics Ranger Mini received by the Telerobotic and Biorobotic Systems Group Laboratory at the University of Alberta. The image processing is intended to run in a Docker container, as it contains various delicate dependencies that are difficult to install properly locally.
 
 ## Assumptions
 
 The steps in this document were done with the following assumptions:
 
-- Operating system: Ubuntu 22
 - ROS version: Humble
 - Camera: ZED 2i
 
