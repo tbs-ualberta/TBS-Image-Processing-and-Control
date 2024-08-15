@@ -67,7 +67,7 @@ class ImageDisplay(Node):
 
     def callback_depth(self, depth_msg):
         try:
-            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
+            self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="32FC1")
         except CvBridgeError as e:
             self.get_logger().error(f"Failed to convert depth image: {e}")
         except Exception as e:

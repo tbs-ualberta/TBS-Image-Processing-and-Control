@@ -17,10 +17,10 @@ class RangerController(Node):
         self.LIN_VEL = self.declare_parameter('lin_vel', '0.5').get_parameter_value().double_value # in m/s
         self.ANG_VEL = self.declare_parameter('ang_vel', '3.0').get_parameter_value().double_value # in rad/s
 
-        # Define following distance (max distance from the target the robot can be without moving)
+        # Define following distance (maximum distance from the target the robot can be before it starts moving laterally)
         self.FOLLOW_DIST = self.declare_parameter('follow_dist','0.7').get_parameter_value().double_value # in meters
 
-        # Define angular tolerance (window in which target can be without the robot moving)
+        # Define angular tolerance (the angular window in which the target can be without the robot moving)
         self.ANG_TOL = self.declare_parameter('ang_tol', '1.0').get_parameter_value().double_value # in rad
         
         # Define publisher for cmd_vel
