@@ -1,4 +1,4 @@
-FROM image_processing_base:latest
+FROM andors/image_processing_base:latest
 
 # Copy files
 COPY . /root/ros_ws/src/
