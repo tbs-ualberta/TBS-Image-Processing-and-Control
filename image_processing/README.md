@@ -46,7 +46,7 @@ This program features a variety of ROS parameters that can be modified by changi
 ### Parameter Table
 | Name | Datatype | Description | Example Value |
 | --- | --- | --- | --- |
-| `prompt` | `string` | The prompt given to the AI model for image detection. Multiple prompts can be used by separating each orompt with a period. | 'person.phone' |
+| `prompt` | `string` | The prompt given to LangSAM for image detection. Multiple prompts can be used by separating each prompt with a period. | 'person.phone' |
 | `target` | `string` | The program selects a mask corresponding this target phrase to publish as the navigation goal. It **must** be contained in the prompt string. | 'person' |
 | `target_confidence_threshold` | `double` | The minimum confidence value required for an object mask to be considered as a target (ranges from 0.0-0.99). | 0.5 |
 | `print_output` | `boolean` | Determines whether the program prints information about each processed frame to the console (i.e. processing time, masks detected, the locations of their centroids, etc.). | False |
